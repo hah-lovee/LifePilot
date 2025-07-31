@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lifepilot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lifepilot
+      POSTGRES_PASSWORD: strong_password
+      POSTGRES_DB: lifepilot_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - lifepilot_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  lifepilot_postgres_data:
