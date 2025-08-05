@@ -1,3 +1,48 @@
+# /.dockerignore
+# /.env
+# /__pycache__
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.log
+
+# Alembic (compiled .pyc внутри versions/)
+alembic/versions/__pycache__/
+
+# venv / poetry / pipenv
+.venv/
+env/
+venv/
+
+# IDE (VS Code, PyCharm, и т.д.)
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.env
+.env.local
+docker-compose.override.yml
 /.dockerignore
-/.env
-/__pycache__
+
+# Pytest / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter / temp
+.ipynb_checkpoints/
+*.tmp
+*.bak
+
+# build artifacts
+dist/
+build/
+*.egg
