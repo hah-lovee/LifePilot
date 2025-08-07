@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import String, Boolean, ForeignKey, Integer
-from app.models.base import Base
+from app.models.reporting.base import ReportingBase
 
-class Domain(Base):
+class Domain(ReportingBase):
     __tablename__ = "domains"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String, unique=True)
@@ -10,7 +10,7 @@ class Domain(Base):
 
     user_domains = relationship("UserDomain", back_populates="domain")
 
-class UserDomain(Base):
+class UserDomain(ReportingBase):
     __tablename__ = "user_domains"
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)

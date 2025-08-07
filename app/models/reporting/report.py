@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import Integer, ForeignKey, Date, Text, UniqueConstraint
-from app.models.base import Base
+from app.models.reporting.base import ReportingBase
 from datetime import datetime, date
 
-class DailyReport(Base):
+class DailyReport(ReportingBase):
     __tablename__ = "daily_reports"
     __table_args__ = (UniqueConstraint("user_id", "date"), )
 
@@ -16,7 +16,7 @@ class DailyReport(Base):
     user = relationship("User", back_populates="reports")
     ratings = relationship("DailyRating", back_populates="report", cascade="all, delete-orphan")
 
-class DailyRating(Base):
+class DailyRating(ReportingBase):
     __tablename__ = "daily_ratings"
 
     id: Mapped[int] = mapped_column(primary_key=True)

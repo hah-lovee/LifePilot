@@ -1,16 +1,30 @@
 services:
-  postgres:
+  report-db:
     image: postgres:16-alpine
-    container_name: lifepilot-postgres
+    container_name: report-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: lifepilot
-      POSTGRES_PASSWORD: strong_password
-      POSTGRES_DB: lifepilot_db
+      POSTGRES_USER: report
+      POSTGRES_PASSWORD: report_password
+      POSTGRES_DB: reporting_db
     ports:
       - "5433:5432"
     volumes:
-      - lifepilot_postgres_data:/var/lib/postgresql/data
+      - report_postgres_data:/var/lib/postgresql/data
+
+  auth-db:
+    image: postgres:16-alpine
+    container_name: auth-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: auth
+      POSTGRES_PASSWORD: super_secure
+      POSTGRES_DB: auth_db
+    ports:
+      - "5444:5432"
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql/data
 
 volumes:
-  lifepilot_postgres_data:
+  report_postgres_data:
+  auth_postgres_data:
