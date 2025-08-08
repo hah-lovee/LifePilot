@@ -1,6 +1,4 @@
-# /.dockerignore
-# /.env
-# /__pycache__
+CmdCommand.txt
 
 # Python
 __pycache__/
@@ -10,8 +8,7 @@ __pycache__/
 *.egg-info/
 *.log
 
-# Alembic (compiled .pyc внутри versions/)
-alembic/versions/__pycache__/
+
 
 # venv / poetry / pipenv
 .venv/
