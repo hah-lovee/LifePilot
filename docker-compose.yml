@@ -25,6 +25,21 @@ services:
     volumes:
       - auth_postgres_data:/var/lib/postgresql/data
 
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      - auth-db
+      - report-db
+    env_file:
+      - .env
+
 volumes:
   report_postgres_data:
   auth_postgres_data:

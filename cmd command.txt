@@ -1,1 +1,0 @@
-alembic -c alembic.ini revision --autogenerate -m "comment"
