@@ -5,7 +5,7 @@ from datetime import datetime
 
 class AuthUser(AuthBase):
     __tablename__ = "users"
-
+    username: Mapped[str] = mapped_column(String, unique=True) 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String, unique=True)
     password_hash: Mapped[str] = mapped_column(String)
