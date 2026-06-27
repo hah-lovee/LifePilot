@@ -1,11 +1,61 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { api, ApiError } from "@/lib/api";
 import type { InvestmentsSummary } from "@/lib/types";
 
 const EXCHANGES = ["okx", "binance", "bybit", "kucoin", "mexc"];
 const BROKERS = ["tbank"];
+
+// type="password" is the single strongest signal browsers use to offer
+// autofilling a saved login — Yandex Browser and other Chromium forks keep
+// doing it even with autoComplete="new-password". Using type="text" with a
+// WebKit-only CSS mask sidesteps that trigger entirely while still hiding
+// the value visually (Yandex/Chrome/Edge are all Blink/WebKit-based).
+const maskedStyle = { WebkitTextSecurity: "disc" } as unknown as CSSProperties;
+
+function SecretInput({
+  name,
+  placeholder,
+  required,
+  value,
+  onChange,
+}: {
+  name: string;
+  placeholder: string;
+  required?: boolean;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        name={name}
+        placeholder={placeholder}
+        required={required}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        data-lpignore="true"
+        data-1p-ignore=""
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={visible ? undefined : maskedStyle}
+        className="input-field w-full pr-16"
+      />
+      <button
+        type="button"
+        onClick={() => setVisible((prev) => !prev)}
+        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[12px] text-[var(--color-faint)] hover:text-[var(--color-ink)]"
+      >
+        {visible ? "Скрыть" : "Показать"}
+      </button>
+    </div>
+  );
+}
 
 export default function InvestmentConnectionsPage() {
   const [error, setError] = useState<string | null>(null);
@@ -119,28 +169,18 @@ export default function InvestmentConnectionsPage() {
             placeholder="API key"
             required
             autoComplete="off"
+            data-lpignore="true"
+            data-1p-ignore=""
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             className="input-field w-full"
           />
-          <input
-            type="password"
-            name="exchange-secret-key"
-            placeholder="Secret key"
-            required
-            autoComplete="new-password"
-            value={secretKey}
-            onChange={(e) => setSecretKey(e.target.value)}
-            className="input-field w-full"
-          />
-          <input
-            type="password"
+          <SecretInput name="exchange-secret-key" placeholder="Secret key" required value={secretKey} onChange={setSecretKey} />
+          <SecretInput
             name="exchange-passphrase"
             placeholder="Passphrase (только для OKX)"
-            autoComplete="new-password"
             value={passphrase}
-            onChange={(e) => setPassphrase(e.target.value)}
-            className="input-field w-full"
+            onChange={setPassphrase}
           />
           <button type="submit" className="btn-primary self-start">
             Подключить
@@ -169,21 +209,14 @@ export default function InvestmentConnectionsPage() {
               </option>
             ))}
           </select>
-          <input
-            type="password"
-            name="broker-api-token"
-            placeholder="API токен"
-            required
-            autoComplete="new-password"
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-            className="input-field w-full"
-          />
+          <SecretInput name="broker-api-token" placeholder="API токен" required value={token} onChange={setToken} />
           <input
             type="text"
             name="broker-account-id"
             placeholder="ID счёта (если несколько)"
             autoComplete="off"
+            data-lpignore="true"
+            data-1p-ignore=""
             value={accountId}
             onChange={(e) => setAccountId(e.target.value)}
             className="input-field w-full"
