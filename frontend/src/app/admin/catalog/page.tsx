@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { API_URL, api, ApiError } from "@/lib/api";
 import { ZoomablePhoto } from "@/components/zoomable-photo";
-import type { Exercise, Habit, HabitFrequency } from "@/lib/types";
+import type { Exercise, Habit, HabitFrequency, MuscleGroup } from "@/lib/types";
 
 const frequencyLabel: Record<HabitFrequency, string> = {
   daily: "Ежедневно",
@@ -11,25 +11,41 @@ const frequencyLabel: Record<HabitFrequency, string> = {
   monthly: "Ежемесячно",
 };
 
+const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
+
+function validatePhoto(file: File): string | null {
+  if (file.size > MAX_PHOTO_BYTES) return "Файл больше 3 МБ — сожмите фото перед загрузкой.";
+  return null;
+}
+
 export default function AdminCatalogPage() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [muscleGroups, setMuscleGroups] = useState<MuscleGroup[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const [habitName, setHabitName] = useState("");
   const [habitFrequency, setHabitFrequency] = useState<HabitFrequency>("daily");
 
+  const [newGroupName, setNewGroupName] = useState("");
+
   const [exerciseName, setExerciseName] = useState("");
-  const [muscleGroup, setMuscleGroup] = useState("");
+  const [muscleGroupId, setMuscleGroupId] = useState<number | "">("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editMuscleGroupId, setEditMuscleGroupId] = useState<number | "">("");
+
   async function loadCatalog() {
-    const [h, e] = await Promise.all([
+    const [h, e, g] = await Promise.all([
       api.get<Habit[]>("/api/habits/catalog"),
-      api.get<Exercise[]>("/api/exercises/catalog"),
+      api.get<Exercise[]>("/api/exercises"),
+      api.get<MuscleGroup[]>("/api/admin/muscle-groups"),
     ]);
     setHabits(h);
     setExercises(e);
+    setMuscleGroups(g);
   }
 
   useEffect(() => {
@@ -61,10 +77,16 @@ export default function AdminCatalogPage() {
     }
   }
 
-  function validatePhoto(file: File): string | null {
-    const maxBytes = 3 * 1024 * 1024;
-    if (file.size > maxBytes) return "Файл больше 3 МБ — сожмите фото перед загрузкой.";
-    return null;
+  async function createMuscleGroup(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    try {
+      await api.post("/api/admin/muscle-groups", { name: newGroupName });
+      setNewGroupName("");
+      await loadCatalog();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Не удалось добавить группу мышц");
+    }
   }
 
   async function createExercise(e: FormEvent) {
@@ -81,11 +103,11 @@ export default function AdminCatalogPage() {
     try {
       const formData = new FormData();
       formData.append("name", exerciseName);
-      if (muscleGroup) formData.append("muscle_group", muscleGroup);
+      if (muscleGroupId !== "") formData.append("muscle_group_id", String(muscleGroupId));
       if (file) formData.append("photo", file);
       await api.upload("/api/admin/exercises", formData);
       setExerciseName("");
-      setMuscleGroup("");
+      setMuscleGroupId("");
       if (fileInputRef.current) fileInputRef.current.value = "";
       await loadCatalog();
     } catch (err) {
@@ -103,6 +125,43 @@ export default function AdminCatalogPage() {
       await loadCatalog();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось удалить упражнение");
+    }
+  }
+
+  async function replacePhoto(exerciseId: number, file: File) {
+    setError(null);
+    const validationError = validatePhoto(file);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    try {
+      const formData = new FormData();
+      formData.append("photo", file);
+      await api.upload(`/api/admin/exercises/${exerciseId}/photo`, formData, "PATCH");
+      await loadCatalog();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Не удалось заменить фото");
+    }
+  }
+
+  function startEdit(ex: Exercise) {
+    setEditingId(ex.id);
+    setEditName(ex.name);
+    setEditMuscleGroupId(muscleGroups.find((g) => g.name === ex.muscle_group)?.id ?? "");
+  }
+
+  async function saveEdit(exerciseId: number) {
+    setError(null);
+    try {
+      await api.patch(`/api/admin/exercises/${exerciseId}`, {
+        name: editName,
+        muscle_group_id: editMuscleGroupId === "" ? null : editMuscleGroupId,
+      });
+      setEditingId(null);
+      await loadCatalog();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Не удалось изменить упражнение");
     }
   }
 
@@ -158,6 +217,31 @@ export default function AdminCatalogPage() {
         </div>
       </section>
 
+      <section className="metric-card mb-3.5">
+        <h2 className="mb-3.5 text-sm font-semibold text-[var(--color-ink)]">Группы мышц</h2>
+        <form onSubmit={createMuscleGroup} className="mb-3 flex items-center gap-2.5">
+          <input
+            type="text"
+            placeholder="Например, «спина»"
+            required
+            value={newGroupName}
+            onChange={(e) => setNewGroupName(e.target.value)}
+            className="input-field flex-1"
+          />
+          <button type="submit" className="btn-secondary whitespace-nowrap">
+            Добавить группу
+          </button>
+        </form>
+        <div className="flex flex-wrap gap-2">
+          {muscleGroups.map((g) => (
+            <span key={g.id} className="tag-chip">
+              {g.name}
+            </span>
+          ))}
+          {muscleGroups.length === 0 && <p className="text-[var(--color-faint)]">Группы мышц пока не заведены.</p>}
+        </div>
+      </section>
+
       <section className="metric-card">
         <h2 className="mb-1 text-sm font-semibold text-[var(--color-ink)]">Упражнения каталога</h2>
         <p className="mb-3.5 text-[12.5px] text-[var(--color-faint)]">
@@ -173,13 +257,18 @@ export default function AdminCatalogPage() {
             onChange={(e) => setExerciseName(e.target.value)}
             className="input-field flex-1"
           />
-          <input
-            type="text"
-            placeholder="Группа мышц"
-            value={muscleGroup}
-            onChange={(e) => setMuscleGroup(e.target.value)}
+          <select
+            value={muscleGroupId}
+            onChange={(e) => setMuscleGroupId(e.target.value ? Number(e.target.value) : "")}
             className="input-field w-[160px]"
-          />
+          >
+            <option value="">Без группы</option>
+            {muscleGroups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
           <input ref={fileInputRef} type="file" accept="image/*" className="input-field w-auto" />
           <button type="submit" className="btn-primary whitespace-nowrap">
             Добавить
@@ -187,7 +276,7 @@ export default function AdminCatalogPage() {
         </form>
         <div className="flex flex-wrap gap-3">
           {exercises.map((ex) => (
-            <div key={ex.id} className="card flex w-[160px] flex-col gap-2 p-3">
+            <div key={ex.id} className="card flex w-[180px] flex-col gap-2 p-3">
               {ex.photo_url ? (
                 <ZoomablePhoto
                   src={`${API_URL}${ex.photo_url}`}
@@ -199,13 +288,63 @@ export default function AdminCatalogPage() {
                   без фото
                 </div>
               )}
-              <span className="text-[13px] font-medium text-[var(--color-ink)]">{ex.name}</span>
-              {ex.muscle_group && (
-                <span className="text-[11.5px] text-[var(--color-faint)]">{ex.muscle_group}</span>
+
+              {editingId === ex.id ? (
+                <div className="flex flex-col gap-1.5">
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="input-field w-full py-1 text-[13px]"
+                  />
+                  <select
+                    value={editMuscleGroupId}
+                    onChange={(e) => setEditMuscleGroupId(e.target.value ? Number(e.target.value) : "")}
+                    className="input-field w-full py-1 text-[13px]"
+                  >
+                    <option value="">Без группы</option>
+                    {muscleGroups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex gap-1.5">
+                    <button onClick={() => saveEdit(ex.id)} className="btn-secondary flex-1 py-1 text-[12.5px]">
+                      Сохранить
+                    </button>
+                    <button onClick={() => setEditingId(null)} className="btn-text text-[12.5px]">
+                      Отмена
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <span className="text-[13px] font-medium text-[var(--color-ink)]">{ex.name}</span>
+                  {ex.muscle_group && (
+                    <span className="text-[11.5px] text-[var(--color-faint)]">{ex.muscle_group}</span>
+                  )}
+                  <button onClick={() => startEdit(ex)} className="btn-text self-start text-[12.5px]">
+                    Изменить
+                  </button>
+                  <label className="btn-text cursor-pointer self-start text-[12.5px]">
+                    Заменить фото
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) replacePhoto(ex.id, file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <button onClick={() => deleteExercise(ex.id, ex.name)} className="btn-text self-start text-[12.5px]">
+                    Удалить
+                  </button>
+                </>
               )}
-              <button onClick={() => deleteExercise(ex.id, ex.name)} className="btn-text self-start text-[12.5px]">
-                Удалить
-              </button>
             </div>
           ))}
           {exercises.length === 0 && <p className="text-[var(--color-faint)]">В каталоге пока нет упражнений.</p>}

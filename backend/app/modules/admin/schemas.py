@@ -32,3 +32,12 @@ class CatalogHabitCreate(BaseModel):
     name: str
     description: str | None = None
     frequency: HabitFrequency = HabitFrequency.DAILY
+
+
+class MuscleGroupCreate(BaseModel):
+    name: str
+
+
+class ExerciseAdminUpdate(BaseModel):
+    name: str | None = None
+    muscle_group_id: int | None = None

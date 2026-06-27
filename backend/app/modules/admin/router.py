@@ -7,6 +7,8 @@ from app.core.uploads import delete_exercise_photo, save_exercise_photo
 from app.models.user import User
 from app.modules.admin.schemas import (
     CatalogHabitCreate,
+    ExerciseAdminUpdate,
+    MuscleGroupCreate,
     RegistrationCodeOut,
     RegistrationCodeUpdate,
     UserAdminOut,
@@ -16,10 +18,22 @@ from app.modules.admin.service import REGISTRATION_CODE_KEY, get_setting, set_se
 from app.core.config import settings as app_config
 from app.modules.habits.models import Habit
 from app.modules.habits.schemas import HabitOut
-from app.modules.sport.models import Exercise
-from app.modules.sport.schemas import ExerciseOut
+from app.modules.sport.models import Exercise, MuscleGroup
+from app.modules.sport.schemas import ExerciseOut, MuscleGroupOut
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_admin)])
+
+
+def _delete_photo_if_unused(db: Session, photo_url: str | None) -> None:
+    """Only remove the file from disk if no other exercise row still points at
+    it — old data from a since-removed "copy exercise" feature could leave
+    several rows sharing one photo_url, and deleting it out from under them
+    broke their photo too."""
+    if not photo_url:
+        return
+    if db.query(Exercise).filter(Exercise.photo_url == photo_url).first() is not None:
+        return
+    delete_exercise_photo(photo_url)
 
 
 @router.get("/users", response_model=list[UserAdminOut])
@@ -63,19 +77,51 @@ def create_catalog_habit(payload: CatalogHabitCreate, db: Session = Depends(get_
     return habit
 
 
+@router.get("/muscle-groups", response_model=list[MuscleGroupOut])
+def list_muscle_groups(db: Session = Depends(get_db)) -> list[MuscleGroup]:
+    return db.query(MuscleGroup).order_by(MuscleGroup.name).all()
+
+
+@router.post("/muscle-groups", response_model=MuscleGroupOut, status_code=status.HTTP_201_CREATED)
+def create_muscle_group(payload: MuscleGroupCreate, db: Session = Depends(get_db)) -> MuscleGroup:
+    name = payload.name.strip()
+    existing = db.query(MuscleGroup).filter(MuscleGroup.name == name).first()
+    if existing is not None:
+        return existing
+    group = MuscleGroup(name=name)
+    db.add(group)
+    db.commit()
+    db.refresh(group)
+    return group
+
+
 @router.post("/exercises", response_model=ExerciseOut, status_code=status.HTTP_201_CREATED)
 async def create_catalog_exercise(
     name: str = Form(...),
     description: str | None = Form(None),
-    muscle_group: str | None = Form(None),
+    muscle_group_id: int | None = Form(None),
     photo: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ) -> Exercise:
     photo_url = await save_exercise_photo(photo) if photo and photo.filename else None
     exercise = Exercise(
-        user_id=None, is_base=True, name=name, description=description, muscle_group=muscle_group, photo_url=photo_url
+        name=name, description=description, muscle_group_id=muscle_group_id, photo_url=photo_url
     )
     db.add(exercise)
+    db.commit()
+    db.refresh(exercise)
+    return exercise
+
+
+@router.patch("/exercises/{exercise_id}", response_model=ExerciseOut)
+def update_catalog_exercise(
+    exercise_id: int, payload: ExerciseAdminUpdate, db: Session = Depends(get_db)
+) -> Exercise:
+    exercise = db.query(Exercise).filter(Exercise.id == exercise_id).first()
+    if exercise is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exercise not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(exercise, field, value)
     db.commit()
     db.refresh(exercise)
     return exercise
@@ -88,9 +134,12 @@ async def replace_exercise_photo(
     exercise = db.query(Exercise).filter(Exercise.id == exercise_id).first()
     if exercise is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exercise not found")
+    old_photo_url = exercise.photo_url
     exercise.photo_url = await save_exercise_photo(photo)
     db.commit()
     db.refresh(exercise)
+    if old_photo_url and old_photo_url != exercise.photo_url:
+        _delete_photo_if_unused(db, old_photo_url)
     return exercise
 
 
@@ -105,9 +154,10 @@ def delete_catalog_habit(habit_id: int, db: Session = Depends(get_db)) -> None:
 
 @router.delete("/exercises/{exercise_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_catalog_exercise(exercise_id: int, db: Session = Depends(get_db)) -> None:
-    exercise = db.query(Exercise).filter(Exercise.id == exercise_id, Exercise.is_base.is_(True)).first()
+    exercise = db.query(Exercise).filter(Exercise.id == exercise_id).first()
     if exercise is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Catalog exercise not found")
-    delete_exercise_photo(exercise.photo_url)
+    photo_url = exercise.photo_url
     db.delete(exercise)
     db.commit()
+    _delete_photo_if_unused(db, photo_url)

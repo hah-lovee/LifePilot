@@ -1,253 +1,240 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { API_URL, api, ApiError } from "@/lib/api";
 import { ZoomablePhoto } from "@/components/zoomable-photo";
 import type { Exercise, ExerciseLog } from "@/lib/types";
 
-const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
-
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function SportPage() {
+  return (
+    <Suspense>
+      <SportContent />
+    </Suspense>
+  );
+}
+
+function SportContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [date, setDate] = useState(searchParams.get("date") ?? today());
+
+  function changeDate(newDate: string) {
+    setDate(newDate);
+    router.replace(`/sport?date=${newDate}`, { scroll: false });
+  }
+
   const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [logs, setLogs] = useState<Record<number, ExerciseLog[]>>({});
+  const [logs, setLogs] = useState<ExerciseLog[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const [name, setName] = useState("");
-  const [muscleGroup, setMuscleGroup] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   async function loadExercises() {
-    const list = await api.get<Exercise[]>("/api/exercises");
-    setExercises(list);
-    const entries = await Promise.all(
-      list.map(async (ex) => {
-        const exLogs = await api.get<ExerciseLog[]>(`/api/exercises/${ex.id}/logs`);
-        return [ex.id, exLogs.slice(-5).reverse()] as const;
-      })
-    );
-    setLogs(Object.fromEntries(entries));
+    setExercises(await api.get<Exercise[]>("/api/exercises"));
+  }
+
+  async function loadLogs() {
+    setLogs(await api.get<ExerciseLog[]>(`/api/exercise-logs?log_date=${date}`));
   }
 
   useEffect(() => {
-    loadExercises().catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки"));
+    loadExercises().catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки упражнений"));
   }, []);
 
-  async function createExercise(e: FormEvent) {
-    e.preventDefault();
+  useEffect(() => {
+    loadLogs().catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки тренировки"));
+  }, [date]);
+
+  async function addSet(exerciseId: number) {
     setError(null);
-    const file = fileInputRef.current?.files?.[0];
-    if (file && file.size > MAX_PHOTO_BYTES) {
-      setError("Файл больше 3 МБ — сожмите фото перед загрузкой.");
-      return;
-    }
     try {
-      const formData = new FormData();
-      formData.append("name", name);
-      if (muscleGroup) formData.append("muscle_group", muscleGroup);
-      if (file) formData.append("photo", file);
-      await api.upload("/api/exercises", formData);
-      setName("");
-      setMuscleGroup("");
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      await loadExercises();
+      await api.post("/api/exercise-logs", { exercise_id: exerciseId, log_date: date, weight: null, reps: null });
+      await loadLogs();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Не удалось создать упражнение");
+      setError(err instanceof ApiError ? err.message : "Не удалось добавить подход");
     }
   }
 
-  async function deleteExercise(id: number, exName: string) {
-    if (!window.confirm(`Удалить упражнение «${exName}» навсегда? Вся история подходов будет потеряна.`)) return;
+  async function updateLog(logId: number, weight: number | null, reps: number | null) {
     setError(null);
     try {
-      await api.delete(`/api/exercises/${id}`);
-      await loadExercises();
+      await api.patch(`/api/exercise-logs/${logId}`, { weight, reps });
+      await loadLogs();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Не удалось удалить упражнение");
+      setError(err instanceof ApiError ? err.message : "Не удалось изменить подход");
     }
   }
 
-  async function addLog(exerciseId: number, log_date: string, weight: string, reps: string, sets: string) {
+  async function deleteLog(logId: number) {
     setError(null);
     try {
-      await api.post(`/api/exercises/${exerciseId}/logs`, {
-        log_date,
-        weight: weight ? Number(weight) : null,
-        reps: reps ? Number(reps) : null,
-        sets: sets ? Number(sets) : 1,
-      });
-      await loadExercises();
+      await api.delete(`/api/exercise-logs/${logId}`);
+      await loadLogs();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Не удалось записать подход");
+      setError(err instanceof ApiError ? err.message : "Не удалось удалить подход");
     }
   }
 
-  async function deleteLog(exerciseId: number, logId: number) {
-    setError(null);
-    try {
-      await api.delete(`/api/exercises/${exerciseId}/logs/${logId}`);
-      await loadExercises();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Не удалось удалить запись");
-    }
+  const exerciseById = new Map(exercises.map((ex) => [ex.id, ex]));
+  const logsByExercise = new Map<number, ExerciseLog[]>();
+  for (const log of logs) {
+    const list = logsByExercise.get(log.exercise_id) ?? [];
+    list.push(log);
+    logsByExercise.set(log.exercise_id, list);
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <h1 className="mb-1 text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Мои упражнения</h1>
-      <p className="mb-4 text-[12.5px] text-[var(--color-faint)]">
-        Рекомендуемое фото: квадратное, ~800×800 px, JPEG/WebP, до 1 МБ (жёсткое ограничение — 3 МБ).
-      </p>
-
-      <form onSubmit={createExercise} className="card mb-5 flex flex-wrap items-center gap-2.5 p-4">
+    <div className="mx-auto max-w-2xl">
+      <div className="mb-5 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Тренировка дня</h1>
         <input
-          type="text"
-          placeholder="Название упражнения — например, «Жим штанги лёжа»"
-          required
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="input-field flex-1"
+          type="date"
+          value={date}
+          onChange={(e) => changeDate(e.target.value)}
+          className="input-field w-auto"
         />
-        <input
-          type="text"
-          placeholder="Группа мышц"
-          value={muscleGroup}
-          onChange={(e) => setMuscleGroup(e.target.value)}
-          className="input-field w-[160px]"
-        />
-        <input ref={fileInputRef} type="file" accept="image/*" className="input-field w-auto" />
-        <button type="submit" className="btn-primary whitespace-nowrap">
-          Добавить
-        </button>
-      </form>
+      </div>
 
       {error && <p className="mb-4 text-sm text-[#b5503e]">{error}</p>}
 
+      {logsByExercise.size === 0 && (
+        <p className="text-[var(--color-faint)]">
+          На этот день не выбрано ни одного упражнения —{" "}
+          <Link href={`/sport/catalog?date=${date}`} className="font-medium text-[var(--color-accent)]">
+            выберите их в каталоге
+          </Link>
+          .
+        </p>
+      )}
+
       <ul className="flex flex-col gap-3.5">
-        {exercises.map((ex) => (
-          <ExerciseCard
-            key={ex.id}
-            exercise={ex}
-            logs={logs[ex.id] ?? []}
-            onDelete={() => deleteExercise(ex.id, ex.name)}
-            onAddLog={(d, w, r, s) => addLog(ex.id, d, w, r, s)}
-            onDeleteLog={(logId) => deleteLog(ex.id, logId)}
+        {Array.from(logsByExercise.entries()).map(([exerciseId, exerciseLogs]) => (
+          <ExerciseGroup
+            key={exerciseId}
+            exercise={exerciseById.get(exerciseId)}
+            logs={exerciseLogs}
+            onAddSet={() => addSet(exerciseId)}
+            onUpdateLog={updateLog}
+            onDeleteLog={deleteLog}
           />
         ))}
-        {exercises.length === 0 && (
-          <p className="text-[var(--color-faint)]">Пока нет упражнений — добавьте первое выше или возьмите из каталога.</p>
-        )}
       </ul>
     </div>
   );
 }
 
-function ExerciseCard({
+function ExerciseGroup({
   exercise,
   logs,
-  onDelete,
-  onAddLog,
+  onAddSet,
+  onUpdateLog,
   onDeleteLog,
 }: {
-  exercise: Exercise;
+  exercise: Exercise | undefined;
   logs: ExerciseLog[];
-  onDelete: () => void;
-  onAddLog: (date: string, weight: string, reps: string, sets: string) => void;
+  onAddSet: () => void;
+  onUpdateLog: (logId: number, weight: number | null, reps: number | null) => void;
   onDeleteLog: (logId: number) => void;
 }) {
-  const [date, setDate] = useState(today());
-  const [weight, setWeight] = useState("");
-  const [reps, setReps] = useState("");
-  const [sets, setSets] = useState("1");
+  return (
+    <li className="card p-4">
+      <div className="mb-3 flex items-center gap-3">
+        {exercise?.photo_url ? (
+          <ZoomablePhoto
+            src={`${API_URL}${exercise.photo_url}`}
+            alt={exercise.name}
+            className="h-[56px] w-[56px] flex-shrink-0 rounded-lg object-cover"
+          />
+        ) : (
+          <div className="flex h-[56px] w-[56px] flex-shrink-0 items-center justify-center rounded-lg bg-[#f2f2ee] text-[10px] text-[var(--color-faint)]">
+            без фото
+          </div>
+        )}
+        <div className="flex-1">
+          <p className="font-semibold text-[var(--color-ink)]">{exercise?.name ?? "Упражнение удалено"}</p>
+          {exercise?.muscle_group && (
+            <p className="text-[11.5px] text-[var(--color-faint)]">{exercise.muscle_group}</p>
+          )}
+        </div>
+        <button onClick={onAddSet} className="btn-secondary whitespace-nowrap py-1.5 text-[12.5px]">
+          + подход
+        </button>
+      </div>
 
-  function submit(e: FormEvent) {
+      <div className="flex flex-col gap-1.5">
+        {logs.map((log) => (
+          <SetRow
+            key={log.id}
+            log={log}
+            onUpdate={(weight, reps) => onUpdateLog(log.id, weight, reps)}
+            onDelete={() => onDeleteLog(log.id)}
+          />
+        ))}
+      </div>
+    </li>
+  );
+}
+
+function SetRow({
+  log,
+  onUpdate,
+  onDelete,
+}: {
+  log: ExerciseLog;
+  onUpdate: (weight: number | null, reps: number | null) => void;
+  onDelete: () => void;
+}) {
+  const [isEditing, setIsEditing] = useState(log.weight === null && log.reps === null);
+  const [weight, setWeight] = useState(log.weight?.toString() ?? "");
+  const [reps, setReps] = useState(log.reps?.toString() ?? "");
+
+  function save(e: FormEvent) {
     e.preventDefault();
-    onAddLog(date, weight, reps, sets);
-    setWeight("");
-    setReps("");
+    onUpdate(weight ? Number(weight) : null, reps ? Number(reps) : null);
+    setIsEditing(false);
   }
 
   return (
-    <li className="card flex gap-4 p-4">
-      {exercise.photo_url ? (
-        <ZoomablePhoto
-          src={`${API_URL}${exercise.photo_url}`}
-          alt={exercise.name}
-          className="h-[84px] w-[84px] flex-shrink-0 rounded-lg object-cover"
-        />
-      ) : (
-        <div className="flex h-[84px] w-[84px] flex-shrink-0 items-center justify-center rounded-lg bg-[#f2f2ee] text-[11px] text-[var(--color-faint)]">
-          без фото
-        </div>
-      )}
-
-      <div className="flex-1">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="font-semibold text-[var(--color-ink)]">{exercise.name}</span>
-            {exercise.muscle_group && (
-              <span className="rounded-md bg-[#f2f2ee] px-2 py-0.5 text-[11.5px] text-[var(--color-muted)]">
-                {exercise.muscle_group}
-              </span>
-            )}
-          </div>
-          <button onClick={onDelete} className="btn-text">
-            Удалить
-          </button>
-        </div>
-
-        <form onSubmit={submit} className="mt-3 flex flex-wrap items-center gap-2">
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input-field w-auto" />
+    <div className="flex items-center gap-2 rounded-md bg-[#fbfbfa] px-2.5 py-1.5">
+      {isEditing ? (
+        <form onSubmit={save} className="flex flex-1 items-center gap-1.5">
           <input
             type="number"
-            placeholder="Вес, кг"
             value={weight}
             onChange={(e) => setWeight(e.target.value)}
-            className="input-field w-[100px]"
+            className="input-field w-[90px]"
             step="0.5"
             min="0"
+            placeholder="Вес, кг"
+            autoFocus
           />
           <input
             type="number"
-            placeholder="Повторы"
             value={reps}
             onChange={(e) => setReps(e.target.value)}
-            className="input-field w-[100px]"
+            className="input-field w-[90px]"
             min="0"
+            placeholder="Повторы"
           />
-          <input
-            type="number"
-            placeholder="Подходы"
-            value={sets}
-            onChange={(e) => setSets(e.target.value)}
-            className="input-field w-[100px]"
-            min="1"
-          />
-          <button type="submit" className="btn-secondary whitespace-nowrap py-1.5 text-[13px]">
-            Записать
+          <button type="submit" className="btn-secondary py-1 text-[12.5px]">
+            Сохранить
           </button>
         </form>
-
-        {logs.length > 0 && (
-          <div className="mt-3 flex flex-col gap-1">
-            {logs.map((log) => (
-              <div
-                key={log.id}
-                className="flex items-center justify-between rounded-md bg-[#fbfbfa] px-2.5 py-1.5 text-[12.5px] text-[var(--color-muted)]"
-              >
-                <span className="font-mono">{log.log_date}</span>
-                <span className="font-mono">
-                  {log.weight ?? "—"} кг × {log.reps ?? "—"} × {log.sets}
-                </span>
-                <button onClick={() => onDeleteLog(log.id)} className="text-[#a2a29b] hover:text-[#b5503e]">
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </li>
+      ) : (
+        <>
+          <span className="flex-1 font-mono text-[13px] text-[var(--color-muted)]">
+            {log.weight ?? "—"} кг × {log.reps ?? "—"}
+          </span>
+          <button onClick={() => setIsEditing(true)} className="btn-text text-[12.5px]">
+            Изменить
+          </button>
+        </>
+      )}
+      <button onClick={onDelete} className="text-[#a2a29b] hover:text-[#b5503e]">
+        ×
+      </button>
+    </div>
   );
 }

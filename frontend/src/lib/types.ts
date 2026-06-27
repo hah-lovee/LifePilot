@@ -27,13 +27,17 @@ export type UserAdmin = {
   last_login_at: string | null;
 };
 
+export type MuscleGroup = {
+  id: number;
+  name: string;
+};
+
 export type Exercise = {
   id: number;
   name: string;
   description: string | null;
   muscle_group: string | null;
   photo_url: string | null;
-  is_base: boolean;
   created_at: string;
 };
 
@@ -43,8 +47,6 @@ export type ExerciseLog = {
   log_date: string;
   weight: number | null;
   reps: number | null;
-  sets: number;
-  note: string | null;
 };
 
 export type HabitLog = {

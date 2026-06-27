@@ -24,7 +24,7 @@ export default function SportProgressPage() {
   useEffect(() => {
     if (exerciseId === null) return;
     api
-      .get<ExerciseLog[]>(`/api/exercises/${exerciseId}/logs`)
+      .get<ExerciseLog[]>(`/api/exercise-logs?exercise_id=${exerciseId}`)
       .then(setLogs)
       .catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки истории"));
   }, [exerciseId]);
@@ -59,7 +59,7 @@ export default function SportProgressPage() {
       </select>
 
       {exercises.length === 0 && (
-        <p className="text-[var(--color-faint)]">Пока нет упражнений — добавьте их на странице «Мои упражнения».</p>
+        <p className="text-[var(--color-faint)]">Упражнений пока нет — попросите администратора добавить их в каталоге.</p>
       )}
 
       {exercises.length > 0 && (
@@ -86,7 +86,6 @@ export default function SportProgressPage() {
                   <th className="border-b border-[var(--color-border-soft)] py-2.5">Дата</th>
                   <th className="border-b border-[var(--color-border-soft)] py-2.5 text-right">Вес</th>
                   <th className="border-b border-[var(--color-border-soft)] py-2.5 text-right">Повторы</th>
-                  <th className="border-b border-[var(--color-border-soft)] py-2.5 text-right">Подходы</th>
                 </tr>
               </thead>
               <tbody>
@@ -97,12 +96,11 @@ export default function SportProgressPage() {
                     <td className="py-2.5 text-right font-mono text-[13px] text-[var(--color-muted)]">
                       {log.reps ?? "—"}
                     </td>
-                    <td className="py-2.5 text-right font-mono text-[13px] text-[var(--color-muted)]">{log.sets}</td>
                   </tr>
                 ))}
                 {recentLogs.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-3 text-[var(--color-faint)]">
+                    <td colSpan={3} className="py-3 text-[var(--color-faint)]">
                       Пока нет записей по этому упражнению.
                     </td>
                   </tr>

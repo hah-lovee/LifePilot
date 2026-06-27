@@ -1,21 +1,34 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 
 const links = [
-  { href: "/diary", label: "Дневник" },
-  { href: "/sport", label: "Спорт" },
-  { href: "/investments", label: "Инвестиции" },
+  { href: "/diary", label: "Дневник", datePerDay: true },
+  { href: "/sport", label: "Спорт", datePerDay: true },
+  { href: "/investments", label: "Инвестиции", datePerDay: false },
 ];
 
 export function NavBar() {
-  const { user, isAuthenticated, logout } = useAuth();
-  const pathname = usePathname();
+  const { isAuthenticated } = useAuth();
   if (!isAuthenticated) return null;
 
-  const allLinks = user?.is_admin ? [...links, { href: "/admin", label: "Админка" }] : links;
+  return (
+    <Suspense>
+      <NavBarContent />
+    </Suspense>
+  );
+}
+
+function NavBarContent() {
+  const { user, logout } = useAuth();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const date = searchParams.get("date");
+
+  const allLinks = user?.is_admin ? [...links, { href: "/admin", label: "Админка", datePerDay: false }] : links;
 
   return (
     <nav className="flex items-center justify-between border-b border-[var(--color-border)] bg-white px-6 py-3">
@@ -29,10 +42,11 @@ export function NavBar() {
         <div className="flex gap-6">
           {allLinks.map((link) => {
             const isActive = pathname.startsWith(link.href);
+            const href = link.datePerDay && date ? `${link.href}?date=${date}` : link.href;
             return (
               <Link
                 key={link.href}
-                href={link.href}
+                href={href}
                 className={
                   isActive
                     ? "border-b-2 border-[var(--color-ink)] pb-[3px] text-sm font-semibold text-[var(--color-ink)]"
