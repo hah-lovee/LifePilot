@@ -1,0 +1,192 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f7f5;
+  --foreground: #1b2227;
+
+  --color-accent: #2d4a5e;
+  --color-accent-hover: #243c4d;
+  --color-accent-soft: #e9eef1;
+  --color-accent-soft-border: #d7e0e6;
+
+  --color-ink: #1b2227;
+  --color-muted: #6e726e;
+  --color-faint: #9c9c95;
+  --color-border: #e7e7e2;
+  --color-border-soft: #f0f0ec;
+  --color-card: #ffffff;
+  --color-page: #f7f7f5;
+
+  --color-score-high-bg: #e6eee7;
+  --color-score-high-fg: #3f6b54;
+  --color-score-mid-bg: #f4eddc;
+  --color-score-mid-fg: #9c7a33;
+  --color-score-low-bg: #f4e2dd;
+  --color-score-low-fg: #b5503e;
+
+  /* The UI is light-only for now. Without this, browsers render native
+     widgets (select dropdowns, etc.) using the OS dark theme while our CSS
+     still sets light text on them — invisible white-on-white options. */
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-soft: var(--color-accent-soft);
+  --color-ink: var(--color-ink);
+  --color-muted: var(--color-muted);
+  --color-faint: var(--color-faint);
+  --color-border: var(--color-border);
+  --color-card: var(--color-card);
+  --color-page: var(--color-page);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+input,
+select,
+textarea {
+  background-color: #ffffff;
+  color: #1b2227;
+}
+
+/* ---- Shared component classes (mirrors the Life Pilot design mock) ---- */
+
+.card {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  color: #ffffff;
+  border-radius: 10px;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: background-color 0.15s ease;
+}
+.btn-primary:hover {
+  background: var(--color-accent-hover);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+}
+
+.btn-secondary {
+  background: #ffffff;
+  color: var(--color-accent);
+  border: 1px solid #cdd7dd;
+  border-radius: 10px;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+.btn-secondary:hover {
+  background: #f4f7f9;
+  border-color: var(--color-accent);
+}
+
+.btn-text {
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+.btn-text:hover {
+  color: var(--color-ink);
+}
+
+.btn-danger {
+  color: #b5503e;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background-color 0.15s ease;
+}
+.btn-danger:hover {
+  background: #f4e2dd;
+}
+
+.input-field {
+  background: #ffffff;
+  color: var(--color-ink);
+  border: 1px solid #e0e0db;
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.875rem;
+  outline: none;
+  transition: all 0.15s ease;
+}
+.input-field:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(45, 74, 94, 0.12);
+}
+
+.tag-chip {
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8125rem;
+  border: 1px solid #e0e0db;
+  color: #4a4f4a;
+  background: #ffffff;
+  transition: all 0.14s ease;
+}
+.tag-chip:hover {
+  background: #f7f7f5;
+}
+.tag-chip-selected {
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+.day-score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.875rem;
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-accent-soft-border);
+  border-radius: 14px;
+  padding: 0.75rem 1.125rem;
+}
+
+.metric-card {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 1.125rem 1.25rem;
+}
+
+.score-pill {
+  border-radius: 8px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.score-pill-high {
+  background: #e6eee7;
+  color: #3f6b54;
+}
+.score-pill-mid {
+  background: #f4eddc;
+  color: #9c7a33;
+}
+.score-pill-low {
+  background: #f4e2dd;
+  color: #b5503e;
+}
+.score-pill-none {
+  background: #efefec;
+  color: #a2a29b;
+}

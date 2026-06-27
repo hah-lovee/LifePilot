@@ -1,0 +1,62 @@
+name: life-pilot
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-life_pilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-life_pilot}
+      POSTGRES_DB: ${POSTGRES_DB:-life_pilot}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-life_pilot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+    depends_on:
+      - backend
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+
+# Investments module (existing parser backend) is intentionally not wired in
+# yet — it currently runs as its own 3-container stack (vault -> vault-init ->
+# api). Once the read API contract is settled, add it here as additional
+# services on this same docker network, and the life-pilot backend will call
+# it over the internal network rather than the public internet. See
+# docs/ARCHITECTURE.md.
