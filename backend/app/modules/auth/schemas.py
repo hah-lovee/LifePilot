@@ -1,10 +1,10 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class UserCreate(BaseModel):
     email: EmailStr
     name: str
-    password: str
+    password: str = Field(min_length=8)
     invite_code: str
 
 
