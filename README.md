@@ -51,7 +51,7 @@ python -m venv .venv
 ./.venv/Scripts/pip install -r requirements.txt   # Linux/macOS: source .venv/bin/activate && pip install -r requirements.txt
 cp .env.example .env                              # заполнить DATABASE_URL, SECRET_KEY, REGISTRATION_CODE
 ./.venv/Scripts/python -m alembic upgrade head
-./.venv/Scripts/python -m uvicorn app.main:app --reload
+./.venv/Scripts/python -m uvicorn app.main:app --reload --port 8002
 
 # frontend (в отдельном терминале)
 cd frontend
@@ -59,7 +59,12 @@ npm install
 npm run dev
 ```
 
-Backend — http://localhost:8000 (Swagger-документация на `/docs`), frontend — http://localhost:3000.
+Backend — http://localhost:8002 (Swagger-документация на `/docs`), frontend — http://localhost:3000.
+
+Порт 8002 — не 8000 — намеренно: 8001 занят локальным `trading-keys-api`, а 8000 на некоторых машинах
+после интенсивной работы с Docker/WSL остаётся занят "фантомными" записями в сетевой таблице Windows,
+которые не привязаны ни к одному процессу (известный баг WinNAT/Hyper-V, лечится перезапуском
+`winnat`/Docker Desktop или ребутом). Чтобы не зависеть от этого, dev-порт backend закреплён за 8002.
 
 ## Переменные окружения
 
@@ -73,7 +78,7 @@ Backend — http://localhost:8000 (Swagger-документация на `/docs`
 | `CORS_ORIGINS` | список разрешённых origin для фронтенда |
 | `UPLOAD_DIR` | каталог для загруженных фото упражнений |
 
-**`frontend`**: `NEXT_PUBLIC_API_URL` — адрес backend (по умолчанию `http://localhost:8000` в dev, `/api` за Caddy в проде).
+**`frontend`**: `NEXT_PUBLIC_API_URL` — адрес backend (по умолчанию `http://localhost:8002` в dev, `/api` за Caddy в проде).
 
 ## Продакшен
 
