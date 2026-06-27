@@ -89,3 +89,8 @@ docker compose up -d --build
 ```
 
 Миграции применяются автоматически при старте контейнера backend.
+
+## Документация
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — архитектура, обоснование стека, roadmap.
+- [docs/ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md) — администрирование: роли, каталог, инвестиции, бэкапы, безопасность.
