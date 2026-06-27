@@ -105,7 +105,7 @@ export default function InvestmentConnectionsPage() {
 
       <section className="metric-card mb-3.5">
         <h2 className="mb-3.5 text-sm font-semibold text-[var(--color-ink)]">Криптобиржа</h2>
-        <form onSubmit={connectExchange} className="flex flex-col gap-2.5">
+        <form onSubmit={connectExchange} autoComplete="off" className="flex flex-col gap-2.5">
           <select value={exchange} onChange={(e) => setExchange(e.target.value)} className="input-field w-auto">
             {EXCHANGES.map((ex) => (
               <option key={ex} value={ex}>
@@ -115,23 +115,29 @@ export default function InvestmentConnectionsPage() {
           </select>
           <input
             type="text"
+            name="exchange-api-key"
             placeholder="API key"
             required
+            autoComplete="off"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             className="input-field w-full"
           />
           <input
             type="password"
+            name="exchange-secret-key"
             placeholder="Secret key"
             required
+            autoComplete="new-password"
             value={secretKey}
             onChange={(e) => setSecretKey(e.target.value)}
             className="input-field w-full"
           />
           <input
             type="password"
+            name="exchange-passphrase"
             placeholder="Passphrase (только для OKX)"
+            autoComplete="new-password"
             value={passphrase}
             onChange={(e) => setPassphrase(e.target.value)}
             className="input-field w-full"
@@ -155,7 +161,7 @@ export default function InvestmentConnectionsPage() {
 
       <section className="metric-card">
         <h2 className="mb-3.5 text-sm font-semibold text-[var(--color-ink)]">Брокер</h2>
-        <form onSubmit={connectBroker} className="flex flex-col gap-2.5">
+        <form onSubmit={connectBroker} autoComplete="off" className="flex flex-col gap-2.5">
           <select value={broker} onChange={(e) => setBroker(e.target.value)} className="input-field w-auto">
             {BROKERS.map((b) => (
               <option key={b} value={b}>
@@ -165,15 +171,19 @@ export default function InvestmentConnectionsPage() {
           </select>
           <input
             type="password"
+            name="broker-api-token"
             placeholder="API токен"
             required
+            autoComplete="new-password"
             value={token}
             onChange={(e) => setToken(e.target.value)}
             className="input-field w-full"
           />
           <input
             type="text"
+            name="broker-account-id"
             placeholder="ID счёта (если несколько)"
+            autoComplete="off"
             value={accountId}
             onChange={(e) => setAccountId(e.target.value)}
             className="input-field w-full"
