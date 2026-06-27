@@ -97,3 +97,82 @@ export type DiaryTag = {
   name: string;
   is_base: boolean;
 };
+
+export type WalletBalance = {
+  currency: string;
+  total: number;
+  free: number;
+  used: number;
+  value_usdt: number | null;
+  average_price: number | null;
+  pnl_usdt: number | null;
+  pnl_percent: number | null;
+};
+
+export type ExchangeBalance = {
+  source_type: "crypto";
+  exchange: string;
+  status: string;
+  balances: WalletBalance[];
+  error: string | null;
+};
+
+export type BrokerPosition = {
+  ticker: string;
+  name: string;
+  instrument_type: string;
+  quantity: number;
+  average_price: number;
+  current_price: number;
+  current_value: number;
+  currency: string;
+  pnl_rub: number | null;
+  pnl_percent: number | null;
+  sector: string | null;
+};
+
+export type BrokerPortfolio = {
+  source_type: "broker";
+  broker: string;
+  account_id: string;
+  account_name: string;
+  total_value: number;
+  currency: string;
+  positions: BrokerPosition[];
+  status: string;
+  error: string | null;
+};
+
+export type InvestmentsSummary = {
+  crypto: ExchangeBalance[];
+  brokers: BrokerPortfolio[];
+};
+
+export type DividendEvent = {
+  ticker: string;
+  name: string;
+  instrument_type: string;
+  payment_date: string;
+  amount_per_unit: number;
+  currency: string;
+  quantity_held: number;
+  total_amount: number;
+};
+
+export type NetWorthPoint = {
+  snapshot_date: string;
+  total_value_rub: number;
+  crypto_value_rub: number;
+  broker_value_rub: number;
+};
+
+export type DiversificationSlice = {
+  label: string;
+  value_rub: number;
+};
+
+export type DiversificationBreakdown = {
+  by_currency: DiversificationSlice[];
+  by_source: DiversificationSlice[];
+  by_sector: DiversificationSlice[];
+};

@@ -20,5 +20,8 @@ class Settings(BaseSettings):
 
     upload_dir: str = "./uploads"
 
+    investments_api_url: str = "http://localhost:8001"
+    investments_api_key: str = ""
+
 
 settings = Settings()

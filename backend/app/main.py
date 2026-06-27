@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,10 +10,20 @@ from app.modules.admin.router import router as admin_router
 from app.modules.auth.router import router as auth_router
 from app.modules.diary.router import router as diary_router
 from app.modules.habits.router import router as habits_router
+from app.modules.investments.router import router as investments_router
+from app.modules.investments.scheduler import start_scheduler, stop_scheduler
 from app.modules.reports.router import router as reports_router
 from app.modules.sport.router import router as sport_router
 
-app = FastAPI(title=settings.app_name)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    start_scheduler()
+    yield
+    stop_scheduler()
+
+
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,8 +42,7 @@ app.include_router(diary_router)
 app.include_router(reports_router)
 app.include_router(sport_router)
 app.include_router(admin_router)
-# Investments module is planned for a future iteration (see docs/ARCHITECTURE.md)
-# and will be wired in here the same way.
+app.include_router(investments_router)
 
 
 @app.get("/api/health")
