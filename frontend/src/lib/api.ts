@@ -1,4 +1,6 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8002";
+// ?? (not ||) — an empty string is a deliberate, valid value in production
+// (same-origin requests through the reverse proxy), not "unset".
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8002";
 
 const TOKEN_KEY = "life_pilot_token";
 
