@@ -128,7 +128,7 @@ function HabitsContent() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Привычки</h1>
         <input
           type="date"
@@ -138,7 +138,7 @@ function HabitsContent() {
         />
       </div>
 
-      <form onSubmit={createHabit} className="card mb-5 flex items-center gap-2.5 p-4">
+      <form onSubmit={createHabit} className="card mb-5 flex flex-wrap items-center gap-2.5 p-4">
         <input
           type="text"
           placeholder="Новая привычка — например, «10 000 шагов»"
@@ -170,7 +170,7 @@ function HabitsContent() {
           const loggedScore = dateLogs[habit.id]?.score ?? null;
           return (
             <li key={habit.id} className="card p-4">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
                   <span className="font-semibold text-[var(--color-ink)]">{habit.name}</span>
                   <span className="rounded-md bg-[#f2f2ee] px-2 py-0.5 text-[11.5px] text-[var(--color-muted)]">
@@ -220,7 +220,7 @@ function HabitsContent() {
           {archivedHabits.map((habit) => (
             <li
               key={habit.id}
-              className="flex items-center justify-between rounded-xl border border-dashed border-[#e0e0db] bg-[#fbfbfa] p-3.5"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed border-[#e0e0db] bg-[#fbfbfa] p-3.5"
             >
               <div className="flex items-center gap-2.5">
                 <span className="text-[var(--color-muted)]">{habit.name}</span>
@@ -256,7 +256,7 @@ function HabitsContent() {
             return (
               <li
                 key={habit.id}
-                className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-white p-3.5"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--color-border)] bg-white p-3.5"
               >
                 <div className="flex items-center gap-2.5">
                   <span className="text-[var(--color-ink)]">{habit.name}</span>

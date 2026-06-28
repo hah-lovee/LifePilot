@@ -69,7 +69,7 @@ function SportCatalogContent() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Каталог упражнений</h1>
         <input
           type="date"
@@ -119,7 +119,7 @@ function SportCatalogContent() {
         {filtered.map((ex) => {
           const isAdded = addedIds.has(ex.id);
           return (
-            <li key={ex.id} className="card flex items-center gap-3 p-3">
+            <li key={ex.id} className="card flex flex-wrap items-center gap-3 p-3">
               {ex.photo_url ? (
                 <ZoomablePhoto
                   src={`${API_URL}${ex.photo_url}`}
@@ -131,7 +131,7 @@ function SportCatalogContent() {
                   без фото
                 </div>
               )}
-              <div className="flex-1">
+              <div className="min-w-[140px] flex-1">
                 <p className="font-medium text-[var(--color-ink)]">{ex.name}</p>
                 {ex.muscle_group && <p className="text-[11.5px] text-[var(--color-faint)]">{ex.muscle_group}</p>}
               </div>

@@ -97,7 +97,7 @@ function DiaryContent() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Запись</h1>
         <input
           type="date"

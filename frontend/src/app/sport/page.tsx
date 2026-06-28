@@ -87,7 +87,7 @@ function SportContent() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Тренировка дня</h1>
         <input
           type="date"
@@ -152,7 +152,7 @@ function ExerciseGroup({
             без фото
           </div>
         )}
-        <div className="flex-1">
+        <div className="min-w-[140px] flex-1">
           <p className="font-semibold text-[var(--color-ink)]">{exercise?.name ?? "Упражнение удалено"}</p>
           {exercise?.muscle_group && (
             <p className="text-[11.5px] text-[var(--color-faint)]">{exercise.muscle_group}</p>

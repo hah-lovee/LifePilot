@@ -70,7 +70,7 @@ export default function TagsPage() {
           {tags.length === 0 && <p className="text-[var(--color-faint)]">Тегов пока нет.</p>}
         </div>
 
-        <form onSubmit={addTag} className="mt-4 flex max-w-[380px] gap-2.5 border-t border-[var(--color-border-soft)] pt-4">
+        <form onSubmit={addTag} className="mt-4 flex max-w-[380px] flex-wrap gap-2.5 border-t border-[var(--color-border-soft)] pt-4">
           <input
             type="text"
             placeholder="Новый тег"

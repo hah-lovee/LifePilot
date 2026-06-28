@@ -56,7 +56,7 @@ export default function AdminUsersPage() {
 
       <section className="metric-card mb-3.5">
         <h2 className="mb-3.5 text-sm font-semibold text-[var(--color-ink)]">Инвайт-код для регистрации</h2>
-        <form onSubmit={saveCode} className="flex max-w-[380px] gap-2.5">
+        <form onSubmit={saveCode} className="flex max-w-[380px] flex-wrap gap-2.5">
           <input
             type="text"
             required

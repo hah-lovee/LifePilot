@@ -176,7 +176,7 @@ export default function AdminCatalogPage() {
 
       <section className="metric-card mb-3.5">
         <h2 className="mb-3.5 text-sm font-semibold text-[var(--color-ink)]">Привычки каталога</h2>
-        <form onSubmit={createHabit} className="mb-4 flex items-center gap-2.5">
+        <form onSubmit={createHabit} className="mb-4 flex flex-wrap items-center gap-2.5">
           <input
             type="text"
             placeholder="Название привычки"
@@ -219,7 +219,7 @@ export default function AdminCatalogPage() {
 
       <section className="metric-card mb-3.5">
         <h2 className="mb-3.5 text-sm font-semibold text-[var(--color-ink)]">Группы мышц</h2>
-        <form onSubmit={createMuscleGroup} className="mb-3 flex items-center gap-2.5">
+        <form onSubmit={createMuscleGroup} className="mb-3 flex flex-wrap items-center gap-2.5">
           <input
             type="text"
             placeholder="Например, «спина»"
