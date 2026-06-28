@@ -35,7 +35,7 @@ export default function InvestmentsPage() {
       <h1 className="mb-5 text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Портфель</h1>
       {error && <p className="mb-4 text-sm text-[#b5503e]">{error}</p>}
 
-      <div className="mb-3.5 grid grid-cols-3 gap-3.5">
+      <div className="mb-3.5 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
         <Stat label="Капитал сейчас" value={latest?.total_value_rub ?? null} />
         <Stat label="Крипто" value={latest?.crypto_value_rub ?? null} />
         <Stat label="Брокер" value={latest?.broker_value_rub ?? null} />
@@ -74,6 +74,7 @@ export default function InvestmentsPage() {
           {exchange.status !== "ok" ? (
             <p className="text-sm text-[#b5503e]">{exchange.error ?? "Ошибка получения баланса"}</p>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-[11.5px] font-semibold uppercase tracking-wide text-[var(--color-faint)]">
@@ -102,6 +103,7 @@ export default function InvestmentsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </section>
       ))}
@@ -114,6 +116,7 @@ export default function InvestmentsPage() {
           {broker.status !== "ok" ? (
             <p className="text-sm text-[#b5503e]">{broker.error ?? "Ошибка получения портфеля"}</p>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-[11.5px] font-semibold uppercase tracking-wide text-[var(--color-faint)]">
@@ -140,6 +143,7 @@ export default function InvestmentsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </section>
       ))}

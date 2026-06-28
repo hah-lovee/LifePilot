@@ -133,6 +133,14 @@ textarea {
   box-shadow: 0 0 0 3px rgba(45, 74, 94, 0.12);
 }
 
+/* iOS Safari auto-zooms the page when focusing an input with font-size
+   under 16px — bump it back up on small screens to prevent that jump. */
+@media (max-width: 640px) {
+  .input-field {
+    font-size: 16px;
+  }
+}
+
 .tag-chip {
   border-radius: 999px;
   padding: 0.4rem 0.85rem;

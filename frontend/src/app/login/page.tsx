@@ -29,7 +29,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="-m-6 flex min-h-[calc(100vh-57px)] items-center justify-center bg-[var(--color-page)] p-7">
+    <div className="-m-3 flex min-h-[calc(100vh-57px)] items-center justify-center bg-[var(--color-page)] p-4 sm:-m-6 sm:p-7">
       <div className="card w-full max-w-[340px] p-8">
         <div className="mb-6 flex flex-col items-center gap-2">
           <span className="flex h-10 w-10 items-center justify-center rounded-[11px] bg-[var(--color-accent)] text-lg font-semibold text-white">

@@ -36,7 +36,7 @@ export default function ReportsPage() {
       {error && <p className="mb-4 text-sm text-[#b5503e]">{error}</p>}
 
       {summary && (
-        <div className="mb-3.5 grid grid-cols-2 gap-3.5">
+        <div className="mb-3.5 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           <Stat label="Средняя оценка дня · 7 дней" value={summary.avg_day_score_7d} />
           <Stat label="Средняя оценка дня · 30 дней" value={summary.avg_day_score_30d} />
         </div>
@@ -65,6 +65,7 @@ export default function ReportsPage() {
 
       <section className="metric-card mb-3.5">
         <h2 className="mb-1 text-sm font-semibold text-[var(--color-ink)]">Привычки за 30 дней</h2>
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-[11.5px] font-semibold uppercase tracking-wide text-[var(--color-faint)]">
@@ -87,6 +88,7 @@ export default function ReportsPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </section>
 
       <section className="metric-card">
@@ -94,6 +96,7 @@ export default function ReportsPage() {
         <p className="mb-1.5 text-xs text-[var(--color-faint)]">
           Сравнение средней оценки дня в дни с тегом и без него. Сильное отклонение выделено цветом.
         </p>
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-[11.5px] font-semibold uppercase tracking-wide text-[var(--color-faint)]">
@@ -148,6 +151,7 @@ export default function ReportsPage() {
             )}
           </tbody>
         </table>
+        </div>
       </section>
     </div>
   );

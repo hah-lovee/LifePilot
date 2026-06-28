@@ -73,6 +73,7 @@ export default function AdminUsersPage() {
 
       <section className="metric-card">
         <h2 className="mb-1 text-sm font-semibold text-[var(--color-ink)]">Пользователи</h2>
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-[11.5px] font-semibold uppercase tracking-wide text-[var(--color-faint)]">
@@ -102,6 +103,7 @@ export default function AdminUsersPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </section>
     </div>
   );

@@ -85,12 +85,12 @@ export function CalendarView({ returnTo }: { returnTo: "/diary" | "/sport" }) {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-5 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Календарь</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => changeMonth(-1)}
-            className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px] border border-[#e0e0db] bg-white text-[var(--color-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
+            className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-[9px] border border-[#e0e0db] bg-white text-[var(--color-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
           >
             ←
           </button>
@@ -118,11 +118,11 @@ export function CalendarView({ returnTo }: { returnTo: "/diary" | "/sport" }) {
           </select>
           <button
             onClick={() => changeMonth(1)}
-            className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px] border border-[#e0e0db] bg-white text-[var(--color-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
+            className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-[9px] border border-[#e0e0db] bg-white text-[var(--color-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
           >
             →
           </button>
-          <button onClick={goToToday} className="btn-secondary py-2 text-[13px]">
+          <button onClick={goToToday} className="btn-secondary flex-shrink-0 py-2 text-[13px]">
             Сегодня
           </button>
         </div>

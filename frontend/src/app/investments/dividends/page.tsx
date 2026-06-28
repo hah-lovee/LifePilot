@@ -24,6 +24,7 @@ export default function InvestmentDividendsPage() {
       {error && <p className="mb-4 text-sm text-[#b5503e]">{error}</p>}
 
       <section className="metric-card">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-[11.5px] font-semibold uppercase tracking-wide text-[var(--color-faint)]">
@@ -60,6 +61,7 @@ export default function InvestmentDividendsPage() {
             )}
           </tbody>
         </table>
+        </div>
       </section>
     </div>
   );

@@ -16,11 +16,11 @@ const subLinks = [
 export default function DiaryLayout({ children }: { children: ReactNode }) {
   return (
     <RequireAuth>
-      <div className="-m-6 flex flex-col">
+      <div className="-m-3 flex flex-col sm:-m-6">
         <Suspense>
           <DiaryNav />
         </Suspense>
-        <div className="bg-[var(--color-page)] p-7">{children}</div>
+        <div className="bg-[var(--color-page)] p-4 sm:p-7">{children}</div>
       </div>
     </RequireAuth>
   );
@@ -32,7 +32,7 @@ function DiaryNav() {
   const date = searchParams.get("date");
 
   return (
-    <nav className="flex gap-6 border-b border-[var(--color-border-soft)] bg-white px-7 text-sm">
+    <nav className="flex gap-4 overflow-x-auto border-b border-[var(--color-border-soft)] bg-white px-4 text-sm sm:gap-6 sm:px-7">
       {subLinks.map((link) => {
         const isActive = pathname === link.href;
         const href = link.datePerDay && date ? `${link.href}?date=${date}` : link.href;
@@ -42,8 +42,8 @@ function DiaryNav() {
             href={href}
             className={
               isActive
-                ? "-mb-px border-b-2 border-[var(--color-accent)] py-[13px] font-semibold text-[var(--color-accent)]"
-                : "-mb-px border-b-2 border-transparent py-[13px] font-medium text-[var(--color-muted)] hover:text-[var(--color-ink)]"
+                ? "-mb-px flex-shrink-0 border-b-2 border-[var(--color-accent)] py-[13px] font-semibold text-[var(--color-accent)]"
+                : "-mb-px flex-shrink-0 border-b-2 border-transparent py-[13px] font-medium text-[var(--color-muted)] hover:text-[var(--color-ink)]"
             }
           >
             {link.label}
