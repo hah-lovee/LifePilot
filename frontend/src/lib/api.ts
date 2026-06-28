@@ -25,6 +25,20 @@ export class ApiError extends Error {
   }
 }
 
+// FastAPI's `detail` is a plain string for most errors, but for 422
+// validation failures it's an array of {msg, loc, ...} objects — passing
+// that straight into Error's message renders as "[object Object]".
+function describeDetail(detail: unknown, fallback: string): string {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail.map((item) =>
+      typeof item === "object" && item !== null && "msg" in item ? String((item as { msg: unknown }).msg) : String(item)
+    );
+    if (messages.length > 0) return messages.join("; ");
+  }
+  return fallback;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers = new Headers(options.headers);
@@ -36,14 +50,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, { ...options, headers });
 
   if (!res.ok) {
-    let detail = res.statusText;
+    let detail: unknown = res.statusText;
     try {
       const data = await res.json();
       detail = data.detail ?? detail;
     } catch {
       // body wasn't JSON, keep statusText
     }
-    throw new ApiError(res.status, detail);
+    throw new ApiError(res.status, describeDetail(detail, res.statusText));
   }
 
   if (res.status === 204) return undefined as T;
@@ -68,7 +82,7 @@ export async function login(email: string, password: string): Promise<string> {
   const res = await fetch(`${API_URL}/api/auth/login`, { method: "POST", body });
   if (!res.ok) {
     const data = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new ApiError(res.status, data.detail ?? res.statusText);
+    throw new ApiError(res.status, describeDetail(data.detail, res.statusText));
   }
   const data = await res.json();
   return data.access_token as string;
