@@ -152,15 +152,19 @@ function DiaryContent() {
               );
             })}
           </div>
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex flex-wrap gap-2">
             <input
               type="text"
               placeholder="Свой тег"
               value={newTagName}
               onChange={(e) => setNewTagName(e.target.value)}
-              className="input-field flex-1 rounded-full py-1.5 text-[13px]"
+              className="input-field min-w-[120px] flex-1 rounded-full py-1.5 text-[13px]"
             />
-            <button type="button" onClick={addCustomTag} className="btn-secondary py-1.5 text-[13px]">
+            <button
+              type="button"
+              onClick={addCustomTag}
+              className="btn-secondary flex-shrink-0 whitespace-nowrap py-1.5 text-[13px]"
+            >
               + тег
             </button>
           </div>

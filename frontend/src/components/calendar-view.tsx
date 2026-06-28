@@ -130,13 +130,13 @@ export function CalendarView({ returnTo }: { returnTo: "/diary" | "/sport" }) {
 
       {error && <p className="mb-4 text-sm text-[#b5503e]">{error}</p>}
 
-      <div className="card p-4">
-        <div className="mb-2 grid grid-cols-7 gap-2 text-center text-xs font-semibold text-[var(--color-faint)]">
+      <div className="card p-2.5 sm:p-4">
+        <div className="mb-1.5 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold text-[var(--color-faint)] sm:gap-2 sm:text-xs">
           {WEEKDAYS.map((day) => (
             <div key={day}>{day}</div>
           ))}
         </div>
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-7 gap-1 sm:gap-2">
           {cells.map((cell, i) => {
             if (cell.day === null || cell.isoDate === null) return <div key={`empty-${i}`} />;
             const score = scoresByDate[cell.isoDate] ?? null;
@@ -146,15 +146,17 @@ export function CalendarView({ returnTo }: { returnTo: "/diary" | "/sport" }) {
               <button
                 key={cell.isoDate}
                 onClick={() => goToDate(cell.isoDate as string)}
-                className={`score-pill ${scoreClass(score)} relative flex aspect-[1/0.84] flex-col justify-between p-2.5 transition-shadow hover:shadow-md ${
+                className={`score-pill ${scoreClass(score)} relative flex aspect-[1/0.84] flex-col justify-between p-1 transition-shadow hover:shadow-md sm:p-2.5 ${
                   isToday ? "ring-2 ring-[var(--color-accent)]" : ""
                 }`}
               >
                 {hasWorkout && (
-                  <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--color-accent)]" />
+                  <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-[var(--color-accent)] sm:right-1.5 sm:top-1.5 sm:h-2 sm:w-2" />
                 )}
-                <span className="text-[13px]">{cell.day}</span>
-                <span className="self-end font-mono text-[13px]">{score !== null ? score.toFixed(1) : "—"}</span>
+                <span className="text-[10px] sm:text-[13px]">{cell.day}</span>
+                <span className="self-end font-mono text-[10px] sm:text-[13px]">
+                  {score !== null ? score.toFixed(1) : "—"}
+                </span>
               </button>
             );
           })}

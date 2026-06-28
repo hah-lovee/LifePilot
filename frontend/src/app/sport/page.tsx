@@ -140,7 +140,7 @@ function ExerciseGroup({
 }) {
   return (
     <li className="card p-4">
-      <div className="mb-3 flex items-center gap-3">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
         {exercise?.photo_url ? (
           <ZoomablePhoto
             src={`${API_URL}${exercise.photo_url}`}
@@ -197,14 +197,14 @@ function SetRow({
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-md bg-[#fbfbfa] px-2.5 py-1.5">
+    <div className="flex flex-wrap items-center gap-2 rounded-md bg-[#fbfbfa] px-2.5 py-1.5">
       {isEditing ? (
-        <form onSubmit={save} className="flex flex-1 items-center gap-1.5">
+        <form onSubmit={save} className="flex flex-1 flex-wrap items-center gap-1.5">
           <input
             type="number"
             value={weight}
             onChange={(e) => setWeight(e.target.value)}
-            className="input-field w-[90px]"
+            className="input-field w-[88px] min-w-[72px] flex-1"
             step="0.5"
             min="0"
             placeholder="Вес, кг"
@@ -214,11 +214,11 @@ function SetRow({
             type="number"
             value={reps}
             onChange={(e) => setReps(e.target.value)}
-            className="input-field w-[90px]"
+            className="input-field w-[88px] min-w-[72px] flex-1"
             min="0"
             placeholder="Повторы"
           />
-          <button type="submit" className="btn-secondary py-1 text-[12.5px]">
+          <button type="submit" className="btn-secondary flex-shrink-0 py-1 text-[12.5px]">
             Сохранить
           </button>
         </form>
@@ -227,12 +227,12 @@ function SetRow({
           <span className="flex-1 font-mono text-[13px] text-[var(--color-muted)]">
             {log.weight ?? "—"} кг × {log.reps ?? "—"}
           </span>
-          <button onClick={() => setIsEditing(true)} className="btn-text text-[12.5px]">
+          <button onClick={() => setIsEditing(true)} className="btn-text flex-shrink-0 text-[12.5px]">
             Изменить
           </button>
         </>
       )}
-      <button onClick={onDelete} className="text-[#a2a29b] hover:text-[#b5503e]">
+      <button onClick={onDelete} className="flex-shrink-0 text-[#a2a29b] hover:text-[#b5503e]">
         ×
       </button>
     </div>
