@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
+import { DateNav } from "@/components/date-nav";
 import type { Habit, HabitFrequency, HabitLog } from "@/lib/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -130,12 +131,7 @@ function HabitsContent() {
     <div className="mx-auto max-w-2xl">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Привычки</h1>
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => changeDate(e.target.value)}
-          className="input-field w-auto"
-        />
+        <DateNav date={date} onChange={changeDate} />
       </div>
 
       <form onSubmit={createHabit} className="card mb-5 flex flex-wrap items-center gap-2.5 p-4">

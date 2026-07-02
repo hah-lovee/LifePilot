@@ -3,7 +3,24 @@
 import { Suspense, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { API_URL, api, ApiError } from "@/lib/api";
+import { DateNav } from "@/components/date-nav";
 import { ZoomablePhoto } from "@/components/zoomable-photo";
 import type { Exercise, ExerciseLog } from "@/lib/types";
 
@@ -29,6 +46,7 @@ function SportContent() {
 
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [logs, setLogs] = useState<ExerciseLog[]>([]);
+  const [exerciseOrder, setExerciseOrder] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   async function loadExercises() {
@@ -46,6 +64,44 @@ function SportContent() {
   useEffect(() => {
     loadLogs().catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки тренировки"));
   }, [date]);
+
+  const exerciseById = new Map(exercises.map((ex) => [ex.id, ex]));
+  const logsByExercise = new Map<number, ExerciseLog[]>();
+  for (const log of logs) {
+    const list = logsByExercise.get(log.exercise_id) ?? [];
+    list.push(log);
+    logsByExercise.set(log.exercise_id, list);
+  }
+
+  // Rebuild exercise order when logs or date change, restoring from localStorage if available.
+  useEffect(() => {
+    const currentIds = Array.from(logsByExercise.keys());
+    let storedOrder: number[] = [];
+    try {
+      const raw = localStorage.getItem(`sport-order-${date}`);
+      if (raw) storedOrder = JSON.parse(raw) as number[];
+    } catch { /* ignore */ }
+    const filtered = storedOrder.filter((id) => currentIds.includes(id));
+    const missing = currentIds.filter((id) => !filtered.includes(id));
+    setExerciseOrder([...filtered, ...missing]);
+  }, [logs, date]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setExerciseOrder((prev) => {
+      const from = prev.indexOf(Number(active.id));
+      const to = prev.indexOf(Number(over.id));
+      const next = arrayMove(prev, from, to);
+      localStorage.setItem(`sport-order-${date}`, JSON.stringify(next));
+      return next;
+    });
+  }
 
   async function addSet(exerciseId: number) {
     setError(null);
@@ -77,24 +133,11 @@ function SportContent() {
     }
   }
 
-  const exerciseById = new Map(exercises.map((ex) => [ex.id, ex]));
-  const logsByExercise = new Map<number, ExerciseLog[]>();
-  for (const log of logs) {
-    const list = logsByExercise.get(log.exercise_id) ?? [];
-    list.push(log);
-    logsByExercise.set(log.exercise_id, list);
-  }
-
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Тренировка дня</h1>
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => changeDate(e.target.value)}
-          className="input-field w-auto"
-        />
+        <DateNav date={date} onChange={changeDate} />
       </div>
 
       {error && <p className="mb-4 text-sm text-[#b5503e]">{error}</p>}
@@ -109,38 +152,103 @@ function SportContent() {
         </p>
       )}
 
-      <ul className="flex flex-col gap-3.5">
-        {Array.from(logsByExercise.entries()).map(([exerciseId, exerciseLogs]) => (
-          <ExerciseGroup
-            key={exerciseId}
-            exercise={exerciseById.get(exerciseId)}
-            logs={exerciseLogs}
-            onAddSet={() => addSet(exerciseId)}
-            onUpdateLog={updateLog}
-            onDeleteLog={deleteLog}
-          />
-        ))}
-      </ul>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={exerciseOrder} strategy={verticalListSortingStrategy}>
+          <ul className="flex flex-col gap-3.5">
+            {exerciseOrder.map((exerciseId, index) => {
+              const exerciseLogs = logsByExercise.get(exerciseId);
+              if (!exerciseLogs) return null;
+              return (
+                <SortableExerciseItem
+                  key={exerciseId}
+                  id={exerciseId}
+                  index={index + 1}
+                  exercise={exerciseById.get(exerciseId)}
+                  logs={exerciseLogs}
+                  onAddSet={() => addSet(exerciseId)}
+                  onUpdateLog={updateLog}
+                  onDeleteLog={deleteLog}
+                />
+              );
+            })}
+          </ul>
+        </SortableContext>
+      </DndContext>
     </div>
   );
 }
 
-function ExerciseGroup({
+function SortableExerciseItem({
+  id,
+  index,
   exercise,
   logs,
   onAddSet,
   onUpdateLog,
   onDeleteLog,
 }: {
+  id: number;
+  index: number;
   exercise: Exercise | undefined;
   logs: ExerciseLog[];
   onAddSet: () => void;
   onUpdateLog: (logId: number, weight: number | null, reps: number | null) => void;
   onDeleteLog: (logId: number) => void;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   return (
-    <li className="card p-4">
-      <div className="mb-3 flex flex-wrap items-center gap-3">
+    <li
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.45 : 1,
+        position: isDragging ? "relative" : undefined,
+        zIndex: isDragging ? 10 : undefined,
+      }}
+    >
+      <ExerciseGroup
+        exercise={exercise}
+        logs={logs}
+        index={index}
+        dragHandleProps={{ ...attributes, ...listeners }}
+        onAddSet={onAddSet}
+        onUpdateLog={onUpdateLog}
+        onDeleteLog={onDeleteLog}
+      />
+    </li>
+  );
+}
+
+function ExerciseGroup({
+  exercise,
+  logs,
+  index,
+  dragHandleProps,
+  onAddSet,
+  onUpdateLog,
+  onDeleteLog,
+}: {
+  exercise: Exercise | undefined;
+  logs: ExerciseLog[];
+  index: number;
+  dragHandleProps?: React.HTMLAttributes<HTMLElement>;
+  onAddSet: () => void;
+  onUpdateLog: (logId: number, weight: number | null, reps: number | null) => void;
+  onDeleteLog: (logId: number) => void;
+}) {
+  return (
+    <div className="card p-4">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          {...dragHandleProps}
+          className="flex-shrink-0 cursor-grab touch-none select-none text-lg leading-none text-[var(--color-faint)] hover:text-[var(--color-muted)] active:cursor-grabbing"
+          aria-label="Перетащить"
+        >
+          ⠿
+        </button>
+        <span className="w-5 flex-shrink-0 font-mono text-sm font-bold text-[var(--color-faint)]">{index}.</span>
         {exercise?.photo_url ? (
           <ZoomablePhoto
             src={`${API_URL}${exercise.photo_url}`}
@@ -152,7 +260,7 @@ function ExerciseGroup({
             без фото
           </div>
         )}
-        <div className="min-w-[140px] flex-1">
+        <div className="min-w-[120px] flex-1">
           <p className="font-semibold text-[var(--color-ink)]">{exercise?.name ?? "Упражнение удалено"}</p>
           {exercise?.muscle_group && (
             <p className="text-[11.5px] text-[var(--color-faint)]">{exercise.muscle_group}</p>
@@ -173,7 +281,7 @@ function ExerciseGroup({
           />
         ))}
       </div>
-    </li>
+    </div>
   );
 }
 

@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { API_URL, api, ApiError } from "@/lib/api";
+import { DateNav } from "@/components/date-nav";
 import { ZoomablePhoto } from "@/components/zoomable-photo";
 import type { Exercise, ExerciseLog } from "@/lib/types";
 
@@ -71,12 +72,7 @@ function SportCatalogContent() {
     <div className="mx-auto max-w-3xl">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Каталог упражнений</h1>
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => changeDate(e.target.value)}
-          className="input-field w-auto"
-        />
+        <DateNav date={date} onChange={changeDate} />
       </div>
       <p className="mb-5 max-w-[560px] text-[13px] leading-relaxed text-[var(--color-muted)]">
         Выберите упражнения для тренировки на выбранную дату — заполнить вес и повторы можно на вкладке «Тренировка
