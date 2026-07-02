@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -37,8 +37,19 @@ function insertLinePrefix(
 const SEP = <span className="mx-0.5 h-4 w-px self-center bg-[var(--color-border)]" />;
 
 export function MarkdownEditor({ value, onChange, placeholder, rows = 12 }: MarkdownEditorProps) {
-  const [preview, setPreview] = useState(false);
+  // Start in preview when there is already content, edit mode for blank entries.
+  const [preview, setPreview] = useState(() => value.trim().length > 0);
   const taRef = useRef<HTMLTextAreaElement>(null);
+
+  // When content loads from the API (empty → non-empty), switch to preview automatically.
+  const prevEmptyRef = useRef(value.trim().length === 0);
+  useEffect(() => {
+    const nowEmpty = value.trim().length === 0;
+    if (prevEmptyRef.current && !nowEmpty) {
+      setPreview(true);
+    }
+    prevEmptyRef.current = nowEmpty;
+  }, [value]);
 
   function wrap(prefix: string, suffix: string) {
     const ta = taRef.current;
@@ -125,14 +136,14 @@ export function MarkdownEditor({ value, onChange, placeholder, rows = 12 }: Mark
         <button
           type="button"
           onClick={() => setPreview((p) => !p)}
-          className={`rounded px-2.5 py-0.5 text-[12px] font-medium transition-colors ${
+          className={`rounded-lg border px-3 py-0.5 text-[12px] font-semibold transition-colors ${
             preview
-              ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]"
-              : "text-[var(--color-muted)] hover:bg-[#efefec] hover:text-[var(--color-ink)]"
+              ? "border-[var(--color-border)] bg-white text-[var(--color-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
+              : "border-[var(--color-accent)] bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)]"
           }`}
           title="Переключить просмотр"
         >
-          {preview ? "Правка" : "Просмотр"}
+          {preview ? "✏️ Правка" : "👁 Просмотр"}
         </button>
       </div>
 
