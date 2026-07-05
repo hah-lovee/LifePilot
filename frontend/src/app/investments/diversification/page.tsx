@@ -183,7 +183,7 @@ function DiversificationPie({
                   nameKey="label"
                   innerRadius={32}
                   outerRadius={68}
-                  onClick={onSectorClick ? (entry) => onSectorClick(entry.label) : undefined}
+                  onClick={onSectorClick ? (entry: any) => onSectorClick(entry.label) : undefined}
                   style={onSectorClick ? { cursor: "pointer" } : undefined}
                 >
                   {slices.map((s, i) => (
