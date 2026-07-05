@@ -51,7 +51,7 @@ export default function InvestmentDiversificationPage() {
     data.by_currency.length === 0 &&
     data.by_source.length === 0 &&
     data.by_sector.length === 0 &&
-    data.by_asset_class.length === 0;
+    (data.by_asset_class?.length ?? 0) === 0;
 
   return (
     <div className="mx-auto max-w-3xl">
