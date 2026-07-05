@@ -101,7 +101,8 @@ def delete_broker(broker: str, user: User = Depends(get_current_user)) -> None:
 @router.get("/summary", response_model=InvestmentsSummary)
 def get_summary(user: User = Depends(get_current_user)) -> dict:
     balances = _balances(user.id)
-    return {"crypto": balances["crypto"], "brokers": balances["brokers"]}
+    rates = client.get_rates()
+    return {"crypto": balances["crypto"], "brokers": balances["brokers"], "usd_rub": rates.get("usd_rub", 0.0)}
 
 
 @router.get("/net-worth", response_model=list[NetWorthPoint])

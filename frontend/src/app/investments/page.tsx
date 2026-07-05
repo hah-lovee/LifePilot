@@ -88,11 +88,26 @@ export default function InvestmentsPage() {
   const cutoff = days > 0 ? new Date(Date.now() - days * 86400000).toISOString().slice(0, 10) : "";
   const filteredHistory = cutoff ? netWorth.filter((p) => p.snapshot_date >= cutoff) : netWorth;
 
+  // Живые цифры из summary (актуальны на момент последнего запроса)
+  const usdRub = summary?.usd_rub ?? 0;
+  const liveCryptoRub = summary
+    ? summary.crypto.reduce(
+        (sum, ex) => sum + ex.balances.reduce((s, b) => s + (b.value_usdt ?? 0), 0),
+        0
+      ) * usdRub
+    : null;
+  const liveBrokerRub = summary
+    ? summary.brokers.reduce((sum, b) => sum + b.total_value, 0)
+    : null;
+  const liveTotalRub =
+    liveCryptoRub !== null && liveBrokerRub !== null ? liveCryptoRub + liveBrokerRub : null;
+
+  // Для P&L и XIRR используем снэпшоты (нужна история вложений)
   const latest = netWorth.at(-1) ?? null;
   const latestInvested = latest?.invested_amount_rub ?? null;
   const pnl =
-    latest && latestInvested !== null
-      ? latest.total_value_rub + (latest.dividends_received_rub ?? 0) - latestInvested
+    liveTotalRub !== null && latestInvested !== null
+      ? liveTotalRub + (latest?.dividends_received_rub ?? 0) - latestInvested
       : null;
   const pnlPct = pnl !== null && latestInvested ? (pnl / latestInvested) * 100 : null;
   const xirr = computeXIRR(netWorth);
@@ -105,20 +120,17 @@ export default function InvestmentsPage() {
 
   const hasConnections = summary && (summary.crypto.length > 0 || summary.brokers.length > 0);
 
-  // Годовой пассивный доход — из дивидендов накопленных (нет в этом endpoint, просто покажем если >0)
-  const annualDivs = latest?.dividends_received_rub ?? null;
-
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="mb-5 text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Портфель</h1>
       {error && <p className="mb-4 text-sm text-[#b5503e]">{error}</p>}
 
       <div className="mb-3.5 grid grid-cols-2 gap-3.5 sm:grid-cols-3">
-        <Stat label="Капитал сейчас" value={latest?.total_value_rub ?? null} />
+        <Stat label="Капитал сейчас" value={liveTotalRub ?? latest?.total_value_rub ?? null} />
         <Stat label="Вложено" value={latestInvested} />
         <StatPnl label="P&L" valuRub={pnl} valuePct={pnlPct} />
-        <Stat label="Крипто" value={latest?.crypto_value_rub ?? null} />
-        <Stat label="Брокер" value={latest?.broker_value_rub ?? null} />
+        <Stat label="Крипто" value={liveCryptoRub ?? latest?.crypto_value_rub ?? null} />
+        <Stat label="Брокер" value={liveBrokerRub ?? latest?.broker_value_rub ?? null} />
         <StatXirr xirr={xirr} />
       </div>
 

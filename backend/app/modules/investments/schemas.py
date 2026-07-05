@@ -68,6 +68,7 @@ class BrokerPortfolio(BaseModel):
 class InvestmentsSummary(BaseModel):
     crypto: list[ExchangeBalance]
     brokers: list[BrokerPortfolio]
+    usd_rub: float = 0.0
 
 
 class RatesOut(BaseModel):

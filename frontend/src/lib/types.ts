@@ -146,6 +146,7 @@ export type BrokerPortfolio = {
 export type InvestmentsSummary = {
   crypto: ExchangeBalance[];
   brokers: BrokerPortfolio[];
+  usd_rub: number;
 };
 
 export type DividendEvent = {
