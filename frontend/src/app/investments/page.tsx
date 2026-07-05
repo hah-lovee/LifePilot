@@ -6,7 +6,7 @@ import { Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } f
 import { api, ApiError, getCachedData, setCachedData } from "@/lib/api";
 import type { InvestmentsSummary, NetWorthPoint } from "@/lib/types";
 
-const SUMMARY_CACHE_KEY = "investments_summary";
+const SUMMARY_CACHE_KEY = "investments_summary_v2";
 const CACHE_TTL = 10 * 60 * 1000; // 10 мин
 
 function formatRub(value: number): string {
@@ -112,11 +112,25 @@ export default function InvestmentsPage() {
   const pnlPct = pnl !== null && latestInvested ? (pnl / latestInvested) * 100 : null;
   const xirr = computeXIRR(netWorth);
 
-  const chartData = filteredHistory.map((p) => ({
-    date: p.snapshot_date.slice(5),
-    total: Math.round(p.total_value_rub),
-    invested: p.invested_amount_rub !== null ? Math.round(p.invested_amount_rub) : undefined,
-  }));
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const chartData = (() => {
+    const base = filteredHistory.map((p) => ({
+      date: p.snapshot_date.slice(5),
+      total: Math.round(p.total_value_rub),
+      invested: p.invested_amount_rub !== null ? Math.round(p.invested_amount_rub) : undefined,
+    }));
+    if (
+      liveTotalRub !== null &&
+      (filteredHistory.length === 0 || filteredHistory.at(-1)!.snapshot_date < todayStr)
+    ) {
+      base.push({
+        date: todayStr.slice(5),
+        total: Math.round(liveTotalRub),
+        invested: latestInvested !== null ? Math.round(latestInvested) : undefined,
+      });
+    }
+    return base;
+  })();
 
   const hasConnections = summary && (summary.crypto.length > 0 || summary.brokers.length > 0);
 
@@ -155,7 +169,7 @@ export default function InvestmentsPage() {
         </div>
         {chartData.length === 0 ? (
           <p className="text-[var(--color-faint)]">
-            Снэпшотов пока нет — первый появится после ночного прогона планировщика.
+            Данных пока нет — подключите биржу или брокера.
           </p>
         ) : (
           <div className="h-64">

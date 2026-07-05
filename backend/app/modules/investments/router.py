@@ -25,10 +25,23 @@ from app.modules.investments.service import (
     compute_diversification,
     get_net_worth_history,
     get_sector_detail,
+    save_snapshot,
 )
 
-_BALANCES_TTL = 300.0   # 5 мин
+_BALANCES_TTL = 300.0    # 5 мин
 _DIVIDENDS_TTL = 1800.0  # 30 мин
+_RATES_TTL = 3600.0      # 1 час — CBR обновляет курс раз в день
+_snapshot_saved_today: dict[int, str] = {}
+
+
+def _rates() -> dict:
+    key = "rates"
+    cached = inv_cache.get(key, _RATES_TTL)
+    if cached is not None:
+        return cached
+    data = client.get_rates()
+    inv_cache.put(key, data)
+    return data
 
 
 def _balances(user_id: int) -> dict:
@@ -50,6 +63,7 @@ def _dividends(user_id: int, lookahead_days: int = 365) -> list[dict]:
     inv_cache.put(key, data)
     return data
 
+
 router = APIRouter(prefix="/api/investments", tags=["investments"])
 
 
@@ -58,10 +72,22 @@ def _invalidate_user_cache(user_id: int) -> None:
     inv_cache.invalidate(f"dividends:{user_id}")
 
 
+def _try_save_snapshot(db: Session, user_id: int, rates: dict) -> None:
+    """Upsert today's snapshot. Accepts already-fetched rates to avoid a second CBR call."""
+    try:
+        balances = _balances(user_id)
+        save_snapshot(db, user_id, balances, rates.get("usd_rub", 0.0), date.today())
+    except Exception:
+        pass
+
+
 @router.post("/exchanges", status_code=201)
-def connect_exchange(payload: ConnectExchangeRequest, user: User = Depends(get_current_user)) -> dict:
+def connect_exchange(payload: ConnectExchangeRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     result = client.connect_exchange(str(user.id), payload.exchange, payload.api_key, payload.secret_key, payload.passphrase)
     _invalidate_user_cache(user.id)
+    _snapshot_saved_today.pop(user.id, None)
+    _try_save_snapshot(db, user.id, _rates())
+    _snapshot_saved_today[user.id] = date.today().isoformat()
     return result
 
 
@@ -79,9 +105,12 @@ def delete_exchange(exchange: str, user: User = Depends(get_current_user)) -> No
 
 
 @router.post("/brokers", status_code=201)
-def connect_broker(payload: ConnectBrokerRequest, user: User = Depends(get_current_user)) -> dict:
+def connect_broker(payload: ConnectBrokerRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     result = client.connect_broker(str(user.id), payload.broker, payload.token, payload.account_id)
     _invalidate_user_cache(user.id)
+    _snapshot_saved_today.pop(user.id, None)
+    _try_save_snapshot(db, user.id, _rates())
+    _snapshot_saved_today[user.id] = date.today().isoformat()
     return result
 
 
@@ -99,9 +128,13 @@ def delete_broker(broker: str, user: User = Depends(get_current_user)) -> None:
 
 
 @router.get("/summary", response_model=InvestmentsSummary)
-def get_summary(user: User = Depends(get_current_user)) -> dict:
+def get_summary(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     balances = _balances(user.id)
-    rates = client.get_rates()
+    rates = _rates()
+    today_str = date.today().isoformat()
+    if _snapshot_saved_today.get(user.id) != today_str:
+        _try_save_snapshot(db, user.id, rates)
+        _snapshot_saved_today[user.id] = today_str
     return {"crypto": balances["crypto"], "brokers": balances["brokers"], "usd_rub": rates.get("usd_rub", 0.0)}
 
 
@@ -129,14 +162,14 @@ def get_net_worth(
 @router.get("/diversification", response_model=DiversificationBreakdown)
 def get_diversification(user: User = Depends(get_current_user)) -> DiversificationBreakdown:
     balances = _balances(user.id)
-    rates = client.get_rates()
+    rates = _rates()
     return compute_diversification(balances, rates["usd_rub"])
 
 
 @router.get("/diversification/sector/{sector}", response_model=SectorDetail)
 def get_sector(sector: str, user: User = Depends(get_current_user)) -> SectorDetail:
     balances = _balances(user.id)
-    rates = client.get_rates()
+    rates = _rates()
     return get_sector_detail(balances, rates["usd_rub"], sector)
 
 
@@ -154,7 +187,7 @@ def get_dividends_monthly(user: User = Depends(get_current_user)) -> list[Monthl
 def get_asset(ticker: str, user: User = Depends(get_current_user)) -> AssetDetail:
     balances = _balances(user.id)
     dividends = _dividends(user.id)
-    rates = client.get_rates()
+    rates = _rates()
     detail = compute_asset_detail(ticker, balances, dividends, rates["usd_rub"])
     if detail is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Актив не найден в портфеле")
