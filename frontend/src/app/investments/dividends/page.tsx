@@ -107,7 +107,7 @@ export default function InvestmentDividendsPage() {
                 />
                 <Tooltip
                   contentStyle={{ borderRadius: 10, border: "1px solid #e7e7e2", fontSize: 12 }}
-                  formatter={(value: number) => [`${formatRub(value)} ₽`, "Выплаты"]}
+                  formatter={(value: any) => [`${formatRub(Number(value))} ₽`, "Выплаты"]}
                 />
                 <Bar dataKey="total" radius={[4, 4, 0, 0]}>
                   {chartData.map((entry) => (

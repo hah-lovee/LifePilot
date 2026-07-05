@@ -154,7 +154,7 @@ export default function InvestmentsPage() {
                 />
                 <Tooltip
                   contentStyle={{ borderRadius: 10, border: "1px solid #e7e7e2", fontSize: 12 }}
-                  formatter={(value: number) => [`${formatRub(value)} ₽`]}
+                  formatter={(value: any) => [`${formatRub(Number(value))} ₽`]}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Line
