@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, getCachedData, setCachedData } from "@/lib/api";
 import type { DividendEvent, MonthlyIncome } from "@/lib/types";
+
+const CACHE_TTL = 10 * 60 * 1000;
 
 function formatRub(value: number): string {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value);
@@ -16,8 +18,12 @@ const MONTH_NAMES: Record<string, string> = {
 };
 
 export default function InvestmentDividendsPage() {
-  const [events, setEvents] = useState<DividendEvent[]>([]);
-  const [monthly, setMonthly] = useState<MonthlyIncome[]>([]);
+  const [events, setEvents] = useState<DividendEvent[]>(
+    () => getCachedData<DividendEvent[]>("investments_dividends", CACHE_TTL) ?? []
+  );
+  const [monthly, setMonthly] = useState<MonthlyIncome[]>(
+    () => getCachedData<MonthlyIncome[]>("investments_monthly", CACHE_TTL) ?? []
+  );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -25,7 +31,12 @@ export default function InvestmentDividendsPage() {
       api.get<DividendEvent[]>("/api/investments/dividends"),
       api.get<MonthlyIncome[]>("/api/investments/dividends/monthly"),
     ])
-      .then(([evs, mo]) => { setEvents(evs); setMonthly(mo); })
+      .then(([evs, mo]) => {
+        setEvents(evs);
+        setMonthly(mo);
+        setCachedData("investments_dividends", evs);
+        setCachedData("investments_monthly", mo);
+      })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки дивидендов"));
   }, []);
 

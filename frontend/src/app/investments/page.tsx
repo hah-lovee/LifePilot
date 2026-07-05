@@ -3,8 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, getCachedData, setCachedData } from "@/lib/api";
 import type { InvestmentsSummary, NetWorthPoint } from "@/lib/types";
+
+const SUMMARY_CACHE_KEY = "investments_summary";
+const CACHE_TTL = 10 * 60 * 1000; // 10 мин
 
 function formatRub(value: number): string {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value);
@@ -62,7 +65,9 @@ const PERIODS = [
 export default function InvestmentsPage() {
   const router = useRouter();
   const [netWorth, setNetWorth] = useState<NetWorthPoint[]>([]);
-  const [summary, setSummary] = useState<InvestmentsSummary | null>(null);
+  const [summary, setSummary] = useState<InvestmentsSummary | null>(
+    () => getCachedData<InvestmentsSummary>(SUMMARY_CACHE_KEY, CACHE_TTL)
+  );
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<(typeof PERIODS)[number]["label"]>("Всё");
 
@@ -74,6 +79,7 @@ export default function InvestmentsPage() {
       .then(([nw, s]) => {
         setNetWorth(nw);
         setSummary(s);
+        setCachedData(SUMMARY_CACHE_KEY, s);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки портфеля"));
   }, []);

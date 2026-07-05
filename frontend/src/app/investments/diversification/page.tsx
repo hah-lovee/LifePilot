@@ -3,8 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, getCachedData, setCachedData } from "@/lib/api";
 import type { DiversificationBreakdown, DiversificationSlice, SectorDetail } from "@/lib/types";
+
+const CACHE_TTL = 10 * 60 * 1000;
 
 const COLORS = ["#2d4a5e", "#5e8aa8", "#9c7a33", "#3f6b54", "#b5503e", "#7a6ea3", "#a3a39c", "#cdd7dd"];
 
@@ -14,7 +16,9 @@ function formatRub(value: number): string {
 
 export default function InvestmentDiversificationPage() {
   const router = useRouter();
-  const [data, setData] = useState<DiversificationBreakdown | null>(null);
+  const [data, setData] = useState<DiversificationBreakdown | null>(
+    () => getCachedData<DiversificationBreakdown>("investments_diversification", CACHE_TTL)
+  );
   const [error, setError] = useState<string | null>(null);
 
   // Drill-down по сектору
@@ -26,7 +30,7 @@ export default function InvestmentDiversificationPage() {
   useEffect(() => {
     api
       .get<DiversificationBreakdown>("/api/investments/diversification")
-      .then(setData)
+      .then((d) => { setData(d); setCachedData("investments_diversification", d); })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки диверсификации"));
   }, []);
 

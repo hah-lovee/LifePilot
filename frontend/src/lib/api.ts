@@ -77,6 +77,27 @@ export const api = {
     request<T>(path, { method, body: formData }),
 };
 
+// ── Локальный кеш для дорогих запросов ────────────────────────
+const _CACHE_PFX = "lp_cache_";
+
+export function getCachedData<T>(key: string, ttlMs: number): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(_CACHE_PFX + key);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw) as { ts: number; data: T };
+    if (Date.now() - ts < ttlMs) return data;
+  } catch {}
+  return null;
+}
+
+export function setCachedData<T>(key: string, data: T): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(_CACHE_PFX + key, JSON.stringify({ ts: Date.now(), data }));
+  } catch {}
+}
+
 export async function login(email: string, password: string): Promise<string> {
   const body = new URLSearchParams({ username: email, password });
   const res = await fetch(`${API_URL}/api/auth/login`, { method: "POST", body });
