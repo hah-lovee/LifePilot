@@ -164,15 +164,50 @@ export type NetWorthPoint = {
   total_value_rub: number;
   crypto_value_rub: number;
   broker_value_rub: number;
+  invested_amount_rub: number | null;
+  dividends_received_rub: number | null;
+};
+
+export type MonthlyIncome = {
+  month: string;
+  total_rub: number;
 };
 
 export type DiversificationSlice = {
   label: string;
   value_rub: number;
+  pct: number;
 };
 
 export type DiversificationBreakdown = {
   by_currency: DiversificationSlice[];
   by_source: DiversificationSlice[];
   by_sector: DiversificationSlice[];
+  by_asset_class: DiversificationSlice[];
+};
+
+export type SectorDetail = {
+  sector: string;
+  value_rub: number;
+  pct: number;
+  positions: BrokerPosition[];
+};
+
+export type AssetDetail = {
+  ticker: string;
+  name: string;
+  instrument_type: string;
+  sector: string | null;
+  currency: string;
+  quantity: number;
+  average_price: number;
+  current_price: number;
+  position_value_rub: number;
+  cost_basis_rub: number;
+  unrealized_pnl_rub: number;
+  unrealized_pnl_pct: number;
+  portfolio_weight_pct: number;
+  upcoming_dividends: DividendEvent[];
+  annual_income_rub: number;
+  yield_on_cost_pct: number;
 };

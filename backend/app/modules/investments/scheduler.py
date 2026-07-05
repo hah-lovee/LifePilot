@@ -23,7 +23,8 @@ def run_daily_snapshot_job() -> None:
                 balances = client.get_balances(str(user.id))
                 if balances is None:
                     continue  # no exchanges/brokers connected yet
-                save_snapshot(db, user.id, balances, rates["usd_rub"], today)
+                dividends = client.get_dividends(str(user.id), lookahead_days=365)
+                save_snapshot(db, user.id, balances, rates["usd_rub"], today, dividends=dividends)
             except Exception:
                 logger.exception("Failed to save investment snapshot for user_id=%s", user.id)
     except Exception:

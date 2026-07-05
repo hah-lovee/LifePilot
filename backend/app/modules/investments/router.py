@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -8,14 +8,23 @@ from app.core.deps import get_current_user
 from app.models.user import User
 from app.modules.investments import client
 from app.modules.investments.schemas import (
+    AssetDetail,
     ConnectBrokerRequest,
     ConnectExchangeRequest,
     DiversificationBreakdown,
     DividendEvent,
     InvestmentsSummary,
+    MonthlyIncome,
     NetWorthPoint,
+    SectorDetail,
 )
-from app.modules.investments.service import compute_diversification, get_net_worth_history
+from app.modules.investments.service import (
+    aggregate_monthly_income,
+    compute_asset_detail,
+    compute_diversification,
+    get_net_worth_history,
+    get_sector_detail,
+)
 
 router = APIRouter(prefix="/api/investments", tags=["investments"])
 
@@ -72,6 +81,8 @@ def get_net_worth(
             total_value_rub=s.total_value_rub,
             crypto_value_rub=s.crypto_value_rub,
             broker_value_rub=s.broker_value_rub,
+            invested_amount_rub=s.invested_amount_rub,
+            dividends_received_rub=s.dividends_received_rub,
         )
         for s in snapshots
     ]
@@ -84,6 +95,30 @@ def get_diversification(user: User = Depends(get_current_user)) -> Diversificati
     return compute_diversification(balances, rates["usd_rub"])
 
 
+@router.get("/diversification/sector/{sector}", response_model=SectorDetail)
+def get_sector(sector: str, user: User = Depends(get_current_user)) -> SectorDetail:
+    balances = client.get_balances(str(user.id)) or {"crypto": [], "brokers": []}
+    rates = client.get_rates()
+    return get_sector_detail(balances, rates["usd_rub"], sector)
+
+
 @router.get("/dividends", response_model=list[DividendEvent])
-def get_dividends(lookahead_days: int = 90, user: User = Depends(get_current_user)) -> list[dict]:
+def get_dividends(lookahead_days: int = 365, user: User = Depends(get_current_user)) -> list[dict]:
     return client.get_dividends(str(user.id), lookahead_days)
+
+
+@router.get("/dividends/monthly", response_model=list[MonthlyIncome])
+def get_dividends_monthly(user: User = Depends(get_current_user)) -> list[MonthlyIncome]:
+    dividends = client.get_dividends(str(user.id), lookahead_days=365)
+    return aggregate_monthly_income(dividends)
+
+
+@router.get("/assets/{ticker}", response_model=AssetDetail)
+def get_asset(ticker: str, user: User = Depends(get_current_user)) -> AssetDetail:
+    balances = client.get_balances(str(user.id)) or {"crypto": [], "brokers": []}
+    dividends = client.get_dividends(str(user.id), lookahead_days=365)
+    rates = client.get_rates()
+    detail = compute_asset_detail(ticker, balances, dividends, rates["usd_rub"])
+    if detail is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Актив не найден в портфеле")
+    return detail

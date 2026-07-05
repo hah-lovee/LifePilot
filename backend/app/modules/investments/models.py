@@ -21,4 +21,6 @@ class InvestmentSnapshot(Base):
     total_value_rub: Mapped[float] = mapped_column(Numeric(16, 2), nullable=False)
     crypto_value_rub: Mapped[float] = mapped_column(Numeric(16, 2), nullable=False)
     broker_value_rub: Mapped[float] = mapped_column(Numeric(16, 2), nullable=False)
+    invested_amount_rub: Mapped[float | None] = mapped_column(Numeric(16, 2), nullable=True)
+    dividends_received_rub: Mapped[float | None] = mapped_column(Numeric(16, 2), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

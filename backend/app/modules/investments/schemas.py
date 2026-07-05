@@ -89,6 +89,11 @@ class DividendEvent(BaseModel):
     total_amount: float
 
 
+class MonthlyIncome(BaseModel):
+    month: str     # "2025-08"
+    total_rub: float
+
+
 # ── Капитал во времени и диверсификация ─────────────────────
 
 class NetWorthPoint(BaseModel):
@@ -96,14 +101,46 @@ class NetWorthPoint(BaseModel):
     total_value_rub: float
     crypto_value_rub: float
     broker_value_rub: float
+    invested_amount_rub: float | None = None
+    dividends_received_rub: float | None = None
 
 
 class DiversificationSlice(BaseModel):
     label: str
     value_rub: float
+    pct: float = 0.0
 
 
 class DiversificationBreakdown(BaseModel):
     by_currency: list[DiversificationSlice]
     by_source: list[DiversificationSlice]
     by_sector: list[DiversificationSlice]
+    by_asset_class: list[DiversificationSlice]
+
+
+class SectorDetail(BaseModel):
+    sector: str
+    value_rub: float
+    pct: float
+    positions: list[BrokerPosition]
+
+
+# ── Профиль отдельного актива ────────────────────────────────
+
+class AssetDetail(BaseModel):
+    ticker: str
+    name: str
+    instrument_type: str
+    sector: str | None
+    currency: str
+    quantity: float
+    average_price: float
+    current_price: float
+    position_value_rub: float
+    cost_basis_rub: float
+    unrealized_pnl_rub: float
+    unrealized_pnl_pct: float
+    portfolio_weight_pct: float
+    upcoming_dividends: list[DividendEvent]
+    annual_income_rub: float
+    yield_on_cost_pct: float
