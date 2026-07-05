@@ -91,6 +91,20 @@ export function getCachedData<T>(key: string, ttlMs: number): T | null {
   return null;
 }
 
+// Возвращает данные из кеша без проверки TTL (для stale-while-revalidate).
+// Используй для инициализации useState — пользователь видит данные мгновенно,
+// свежий запрос обновит их в фоне.
+export function getStaleData<T>(key: string): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(_CACHE_PFX + key);
+    if (!raw) return null;
+    const { data } = JSON.parse(raw) as { ts: number; data: T };
+    return data ?? null;
+  } catch {}
+  return null;
+}
+
 export function setCachedData<T>(key: string, data: T): void {
   if (typeof window === "undefined") return;
   try {

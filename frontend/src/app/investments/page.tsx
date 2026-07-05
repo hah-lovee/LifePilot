@@ -3,11 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { api, ApiError, getCachedData, setCachedData } from "@/lib/api";
+import { api, ApiError, getStaleData, setCachedData } from "@/lib/api";
 import type { InvestmentsSummary, NetWorthPoint } from "@/lib/types";
 
 const SUMMARY_CACHE_KEY = "investments_summary_v2";
-const CACHE_TTL = 10 * 60 * 1000; // 10 мин
 
 function formatRub(value: number): string {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value);
@@ -66,7 +65,7 @@ export default function InvestmentsPage() {
   const router = useRouter();
   const [netWorth, setNetWorth] = useState<NetWorthPoint[]>([]);
   const [summary, setSummary] = useState<InvestmentsSummary | null>(
-    () => getCachedData<InvestmentsSummary>(SUMMARY_CACHE_KEY, CACHE_TTL)
+    () => getStaleData<InvestmentsSummary>(SUMMARY_CACHE_KEY)
   );
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<(typeof PERIODS)[number]["label"]>("Всё");

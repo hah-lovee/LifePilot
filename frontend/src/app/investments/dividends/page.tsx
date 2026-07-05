@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { api, ApiError, getCachedData, setCachedData } from "@/lib/api";
+import { api, ApiError, getStaleData, setCachedData } from "@/lib/api";
 import type { DividendEvent, MonthlyIncome } from "@/lib/types";
-
-const CACHE_TTL = 10 * 60 * 1000;
 
 function formatRub(value: number): string {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value);
@@ -19,10 +17,10 @@ const MONTH_NAMES: Record<string, string> = {
 
 export default function InvestmentDividendsPage() {
   const [events, setEvents] = useState<DividendEvent[]>(
-    () => getCachedData<DividendEvent[]>("investments_dividends", CACHE_TTL) ?? []
+    () => getStaleData<DividendEvent[]>("investments_dividends") ?? []
   );
   const [monthly, setMonthly] = useState<MonthlyIncome[]>(
-    () => getCachedData<MonthlyIncome[]>("investments_monthly", CACHE_TTL) ?? []
+    () => getStaleData<MonthlyIncome[]>("investments_monthly") ?? []
   );
   const [error, setError] = useState<string | null>(null);
 
