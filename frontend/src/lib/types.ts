@@ -183,7 +183,7 @@ export type DiversificationBreakdown = {
   by_currency: DiversificationSlice[];
   by_source: DiversificationSlice[];
   by_sector: DiversificationSlice[];
-  by_asset_class: DiversificationSlice[];
+  by_asset_class?: DiversificationSlice[];
 };
 
 export type SectorDetail = {

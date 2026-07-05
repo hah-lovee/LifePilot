@@ -65,7 +65,7 @@ export default function InvestmentDiversificationPage() {
 
       {data && !isEmpty && (
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-          <DiversificationPie title="По классу актива" slices={data.by_asset_class} />
+          <DiversificationPie title="По классу актива" slices={data.by_asset_class ?? []} />
           <DiversificationPie title="По валюте" slices={data.by_currency} />
           <DiversificationPie title="По брокеру / бирже" slices={data.by_source} />
           <DiversificationPie
