@@ -126,3 +126,14 @@ def get_rates() -> dict:
     resp = _request("get", "/rates", timeout=15)
     _raise_for_status(resp)
     return resp.json()
+
+
+def sync_trades(user_guid: str) -> dict:
+    """Скачивает delta истории сделок со всех бирж в локальную БД trading-keys-api."""
+    try:
+        resp = _request("post", f"/trades/sync/{user_guid}", timeout=120)
+        if resp.ok:
+            return resp.json()
+        return {"synced": 0, "errors": [resp.text]}
+    except Exception:
+        return {"synced": 0, "errors": ["sync request failed"]}

@@ -33,6 +33,18 @@ def run_daily_snapshot_job() -> None:
         db.close()
 
 
+def run_hourly_trade_sync_job() -> None:
+    db = SessionLocal()
+    try:
+        for user in db.query(User).all():
+            try:
+                client.sync_trades(str(user.id))
+            except Exception:
+                logger.exception("Trade sync failed for user_id=%s", user.id)
+    finally:
+        db.close()
+
+
 def start_scheduler() -> None:
     _scheduler.add_job(
         run_daily_snapshot_job,
@@ -40,6 +52,13 @@ def start_scheduler() -> None:
         hour=23,
         minute=50,
         id="investments_daily_snapshot",
+        replace_existing=True,
+    )
+    _scheduler.add_job(
+        run_hourly_trade_sync_job,
+        trigger="interval",
+        hours=1,
+        id="investments_hourly_trade_sync",
         replace_existing=True,
     )
     _scheduler.start()

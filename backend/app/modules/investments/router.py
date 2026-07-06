@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -82,7 +82,12 @@ def _try_save_snapshot(db: Session, user_id: int, rates: dict) -> None:
 
 
 @router.post("/exchanges", status_code=201)
-def connect_exchange(payload: ConnectExchangeRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+def connect_exchange(
+    payload: ConnectExchangeRequest,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
     result = client.connect_exchange(
         str(user.id), payload.exchange, payload.api_key, payload.secret_key,
         payload.passphrase, portfolio_name=payload.portfolio_name,
@@ -91,6 +96,7 @@ def connect_exchange(payload: ConnectExchangeRequest, user: User = Depends(get_c
     _snapshot_saved_today.pop(user.id, None)
     _try_save_snapshot(db, user.id, _rates())
     _snapshot_saved_today[user.id] = date.today().isoformat()
+    background_tasks.add_task(client.sync_trades, str(user.id))
     return result
 
 
