@@ -83,7 +83,10 @@ def _try_save_snapshot(db: Session, user_id: int, rates: dict) -> None:
 
 @router.post("/exchanges", status_code=201)
 def connect_exchange(payload: ConnectExchangeRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
-    result = client.connect_exchange(str(user.id), payload.exchange, payload.api_key, payload.secret_key, payload.passphrase)
+    result = client.connect_exchange(
+        str(user.id), payload.exchange, payload.api_key, payload.secret_key,
+        payload.passphrase, portfolio_name=payload.portfolio_name,
+    )
     _invalidate_user_cache(user.id)
     _snapshot_saved_today.pop(user.id, None)
     _try_save_snapshot(db, user.id, _rates())
@@ -93,20 +96,26 @@ def connect_exchange(payload: ConnectExchangeRequest, user: User = Depends(get_c
 
 @router.put("/exchanges")
 def update_exchange(payload: ConnectExchangeRequest, user: User = Depends(get_current_user)) -> dict:
-    result = client.update_exchange(str(user.id), payload.exchange, payload.api_key, payload.secret_key, payload.passphrase)
+    result = client.update_exchange(
+        str(user.id), payload.exchange, payload.api_key, payload.secret_key,
+        payload.passphrase, portfolio_name=payload.portfolio_name,
+    )
     _invalidate_user_cache(user.id)
     return result
 
 
-@router.delete("/exchanges/{exchange}", status_code=204)
-def delete_exchange(exchange: str, user: User = Depends(get_current_user)) -> None:
-    client.delete_exchange(str(user.id), exchange)
+@router.delete("/exchanges/{portfolio_name}", status_code=204)
+def delete_exchange(portfolio_name: str, user: User = Depends(get_current_user)) -> None:
+    client.delete_exchange(str(user.id), portfolio_name)
     _invalidate_user_cache(user.id)
 
 
 @router.post("/brokers", status_code=201)
 def connect_broker(payload: ConnectBrokerRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
-    result = client.connect_broker(str(user.id), payload.broker, payload.token, payload.account_id)
+    result = client.connect_broker(
+        str(user.id), payload.broker, payload.token,
+        payload.account_id, portfolio_name=payload.portfolio_name,
+    )
     _invalidate_user_cache(user.id)
     _snapshot_saved_today.pop(user.id, None)
     _try_save_snapshot(db, user.id, _rates())
@@ -116,14 +125,17 @@ def connect_broker(payload: ConnectBrokerRequest, user: User = Depends(get_curre
 
 @router.put("/brokers")
 def update_broker(payload: ConnectBrokerRequest, user: User = Depends(get_current_user)) -> dict:
-    result = client.update_broker(str(user.id), payload.broker, payload.token, payload.account_id)
+    result = client.update_broker(
+        str(user.id), payload.broker, payload.token,
+        payload.account_id, portfolio_name=payload.portfolio_name,
+    )
     _invalidate_user_cache(user.id)
     return result
 
 
-@router.delete("/brokers/{broker}", status_code=204)
-def delete_broker(broker: str, user: User = Depends(get_current_user)) -> None:
-    client.delete_broker(str(user.id), broker)
+@router.delete("/brokers/{portfolio_name}", status_code=204)
+def delete_broker(portfolio_name: str, user: User = Depends(get_current_user)) -> None:
+    client.delete_broker(str(user.id), portfolio_name)
     _invalidate_user_cache(user.id)
 
 

@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 class ConnectExchangeRequest(BaseModel):
     exchange: str = Field(..., examples=["okx"])
+    portfolio_name: str | None = Field(None, description="Уникальное название портфеля (по умолчанию — название биржи)")
     api_key: str
     secret_key: str
     passphrase: str | None = None
@@ -14,6 +15,7 @@ class ConnectExchangeRequest(BaseModel):
 
 class ConnectBrokerRequest(BaseModel):
     broker: str = Field(..., examples=["tbank"])
+    portfolio_name: str | None = Field(None, description="Уникальное название портфеля (по умолчанию — название брокера)")
     token: str
     account_id: str | None = None
 
@@ -34,6 +36,7 @@ class WalletBalance(BaseModel):
 class ExchangeBalance(BaseModel):
     source_type: str = "crypto"
     exchange: str
+    portfolio_name: str = ""
     status: str
     balances: list[WalletBalance]
     error: str | None = None
@@ -56,6 +59,7 @@ class BrokerPosition(BaseModel):
 class BrokerPortfolio(BaseModel):
     source_type: str = "broker"
     broker: str
+    portfolio_name: str = ""
     account_id: str
     account_name: str
     total_value: float

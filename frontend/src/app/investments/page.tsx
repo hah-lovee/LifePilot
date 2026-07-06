@@ -217,102 +217,127 @@ export default function InvestmentsPage() {
         </p>
       )}
 
-      {summary?.crypto.map((exchange) => (
-        <section key={exchange.exchange} className="metric-card mb-3.5">
-          <h2 className="mb-1 text-sm font-semibold capitalize text-[var(--color-ink)]">{exchange.exchange}</h2>
-          {exchange.status !== "ok" ? (
-            <p className="text-sm text-[#b5503e]">{exchange.error ?? "Ошибка получения баланса"}</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-[11.5px] font-semibold uppercase tracking-wide text-[var(--color-faint)]">
-                    <th className="border-b border-[var(--color-border-soft)] py-2.5">Валюта</th>
-                    <th className="border-b border-[var(--color-border-soft)] py-2.5 text-right">Кол-во</th>
-                    <th className="border-b border-[var(--color-border-soft)] py-2.5 text-right">USDT</th>
-                    <th className="border-b border-[var(--color-border-soft)] py-2.5 text-right">P&L</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {exchange.balances.map((w) => (
-                    <tr key={w.currency} className="border-b border-[#f5f5f1]">
-                      <td className="py-2.5 font-medium">{w.currency}</td>
-                      <td className="py-2.5 text-right font-mono">{w.total}</td>
-                      <td className="py-2.5 text-right font-mono font-semibold">
-                        {w.value_usdt?.toFixed(2) ?? "—"}
-                      </td>
-                      <td
-                        className={`py-2.5 text-right font-mono text-[13px] ${
-                          w.pnl_usdt !== null && w.pnl_usdt < 0 ? "text-[#b5503e]" : "text-[#3f6b54]"
-                        }`}
-                      >
-                        {w.pnl_usdt !== null ? `${w.pnl_usdt >= 0 ? "+" : ""}${w.pnl_usdt.toFixed(2)}` : "—"}
-                      </td>
+      {summary?.crypto.map((exchange) => {
+        const headerLabel =
+          exchange.portfolio_name && exchange.portfolio_name !== exchange.exchange
+            ? `${exchange.exchange} · ${exchange.portfolio_name}`
+            : exchange.portfolio_name || exchange.exchange;
+        return (
+          <section key={exchange.portfolio_name || exchange.exchange} className="metric-card mb-3.5">
+            <h2 className="mb-1 text-sm font-semibold capitalize text-[var(--color-ink)]">{headerLabel}</h2>
+            {exchange.status !== "ok" ? (
+              <p className="text-sm text-[#b5503e]">{exchange.error ?? "Ошибка получения баланса"}</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[11.5px] font-semibold uppercase tracking-wide text-[var(--color-faint)]">
+                      <th className="border-b border-[var(--color-border-soft)] py-2.5">Валюта</th>
+                      <th className="border-b border-[var(--color-border-soft)] py-2.5 text-right">Кол-во</th>
+                      <th className="border-b border-[var(--color-border-soft)] py-2.5 text-right">USDT</th>
+                      <th className="border-b border-[var(--color-border-soft)] py-2.5 text-right">P&L</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      ))}
+                  </thead>
+                  <tbody>
+                    {exchange.balances.map((w) => (
+                      <tr key={w.currency} className="border-b border-[#f5f5f1]">
+                        <td className="py-2.5 font-medium">{w.currency}</td>
+                        <td className="py-2.5 text-right font-mono">{w.total}</td>
+                        <td className="py-2.5 text-right font-mono font-semibold">
+                          {w.value_usdt?.toFixed(2) ?? "—"}
+                        </td>
+                        <td
+                          className={`py-2.5 text-right font-mono text-[13px] ${
+                            w.pnl_usdt !== null && w.pnl_usdt < 0 ? "text-[#b5503e]" : "text-[#3f6b54]"
+                          }`}
+                        >
+                          {w.pnl_usdt !== null ? `${w.pnl_usdt >= 0 ? "+" : ""}${w.pnl_usdt.toFixed(2)}` : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        );
+      })}
 
-      {summary?.brokers.map((broker) => (
-        <section key={broker.broker} className="metric-card mb-3.5">
-          <h2 className="mb-1 text-sm font-semibold capitalize text-[var(--color-ink)]">
-            {broker.broker} · {broker.account_name}
-          </h2>
-          {broker.status !== "ok" ? (
-            <p className="text-sm text-[#b5503e]">{broker.error ?? "Ошибка получения портфеля"}</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-[11.5px] font-semibold uppercase tracking-wide text-[var(--color-faint)]">
-                    <th className="border-b border-[var(--color-border-soft)] py-2.5">Название</th>
-                    <th className="border-b border-[var(--color-border-soft)] py-2.5 text-right">Сектор</th>
-                    <th className="border-b border-[var(--color-border-soft)] py-2.5 text-right">Стоимость</th>
-                    <th className="border-b border-[var(--color-border-soft)] py-2.5 text-right">P&L ₽</th>
-                    <th className="border-b border-[var(--color-border-soft)] py-2.5 text-right">P&L %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {broker.positions.map((p) => (
-                    <tr
-                      key={p.ticker}
-                      onClick={() => router.push(`/investments/assets/${encodeURIComponent(p.ticker)}`)}
-                      className="cursor-pointer border-b border-[#f5f5f1] hover:bg-[#fafaf8] transition-colors"
-                    >
-                      <td className="py-2.5">
-                        <span className="font-medium">{p.name}</span>
-                        <span className="ml-1.5 text-[11px] text-[var(--color-faint)]">{p.ticker}</span>
-                      </td>
-                      <td className="py-2.5 text-right text-[12px] text-[var(--color-muted)]">
-                        {p.sector ?? "—"}
-                      </td>
-                      <td className="py-2.5 text-right font-mono font-semibold">{formatRub(p.current_value)} ₽</td>
-                      <td
-                        className={`py-2.5 text-right font-mono text-[13px] ${
-                          p.pnl_rub !== null && p.pnl_rub < 0 ? "text-[#b5503e]" : "text-[#3f6b54]"
-                        }`}
-                      >
-                        {p.pnl_rub !== null ? `${p.pnl_rub >= 0 ? "+" : ""}${formatRub(p.pnl_rub)}` : "—"}
-                      </td>
-                      <td
-                        className={`py-2.5 text-right font-mono text-[13px] ${
-                          p.pnl_percent !== null && p.pnl_percent < 0 ? "text-[#b5503e]" : "text-[#3f6b54]"
-                        }`}
-                      >
-                        {p.pnl_percent !== null ? formatPct(p.pnl_percent) : "—"}
-                      </td>
+      {summary?.brokers.map((broker) => {
+        const brokerHeader =
+          broker.portfolio_name && broker.portfolio_name !== broker.broker
+            ? `${broker.broker} · ${broker.portfolio_name}`
+            : broker.portfolio_name || broker.broker;
+        return (
+          <section key={broker.portfolio_name || broker.broker} className="metric-card mb-3.5">
+            <h2 className="mb-1 text-sm font-semibold capitalize text-[var(--color-ink)]">
+              {brokerHeader}
+              {broker.account_name && (
+                <span className="ml-2 text-[12px] font-normal text-[var(--color-muted)]">{broker.account_name}</span>
+              )}
+            </h2>
+            {broker.status !== "ok" ? (
+              <p className="text-sm text-[#b5503e]">{broker.error ?? "Ошибка получения портфеля"}</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[11.5px] font-semibold uppercase tracking-wide text-[var(--color-faint)]">
+                      <th className="border-b border-[var(--color-border-soft)] py-2.5">Название</th>
+                      <th className="border-b border-[var(--color-border-soft)] py-2.5 text-right">Сектор</th>
+                      <th className="border-b border-[var(--color-border-soft)] py-2.5 text-right">Стоимость</th>
+                      <th className="border-b border-[var(--color-border-soft)] py-2.5 text-right">P&L ₽</th>
+                      <th className="border-b border-[var(--color-border-soft)] py-2.5 text-right">P&L %</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      ))}
+                  </thead>
+                  <tbody>
+                    {broker.positions.map((p) => (
+                      <tr
+                        key={p.ticker}
+                        onClick={() => router.push(`/investments/assets/${encodeURIComponent(p.ticker)}`)}
+                        className="cursor-pointer border-b border-[#f5f5f1] hover:bg-[#fafaf8] transition-colors"
+                      >
+                        <td className="py-2.5">
+                          <span className="font-medium">{p.name}</span>
+                          <span className="ml-1.5 text-[11px] text-[var(--color-faint)]">{p.ticker}</span>
+                          {p.instrument_type === "bond" && (
+                            <span className="ml-1.5 rounded bg-[#f0f4f7] px-1.5 py-0.5 text-[10px] text-[var(--color-muted)]">
+                              облигация
+                            </span>
+                          )}
+                          {p.instrument_type === "etf" && (
+                            <span className="ml-1.5 rounded bg-[#f5f5f1] px-1.5 py-0.5 text-[10px] text-[var(--color-muted)]">
+                              ETF
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 text-right text-[12px] text-[var(--color-muted)]">
+                          {p.sector ?? "—"}
+                        </td>
+                        <td className="py-2.5 text-right font-mono font-semibold">{formatRub(p.current_value)} ₽</td>
+                        <td
+                          className={`py-2.5 text-right font-mono text-[13px] ${
+                            p.pnl_rub !== null && p.pnl_rub < 0 ? "text-[#b5503e]" : "text-[#3f6b54]"
+                          }`}
+                        >
+                          {p.pnl_rub !== null ? `${p.pnl_rub >= 0 ? "+" : ""}${formatRub(p.pnl_rub)}` : "—"}
+                        </td>
+                        <td
+                          className={`py-2.5 text-right font-mono text-[13px] ${
+                            p.pnl_percent !== null && p.pnl_percent < 0 ? "text-[#b5503e]" : "text-[#3f6b54]"
+                          }`}
+                        >
+                          {p.pnl_percent !== null ? formatPct(p.pnl_percent) : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        );
+      })}
     </div>
   );
 }

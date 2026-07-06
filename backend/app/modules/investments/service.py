@@ -95,28 +95,32 @@ def compute_diversification(balances: dict, usd_rub: float) -> DiversificationBr
     for exchange in balances.get("crypto", []):
         if exchange.get("status") != "ok":
             continue
-        exchange_name = exchange["exchange"]
+        # Используем portfolio_name как метку источника (показывает "bybit_основной" вместо "bybit")
+        source_label = exchange.get("portfolio_name") or exchange["exchange"]
         for wallet in exchange.get("balances", []):
             value_rub = (wallet.get("value_usdt") or 0) * usd_rub
             if value_rub <= 0:
                 continue
             by_currency[wallet["currency"]] = by_currency.get(wallet["currency"], 0) + value_rub
-            by_source[exchange_name] = by_source.get(exchange_name, 0) + value_rub
+            by_source[source_label] = by_source.get(source_label, 0) + value_rub
             by_sector["Криптовалюта"] = by_sector.get("Криптовалюта", 0) + value_rub
             by_asset_class["Криптовалюта"] = by_asset_class.get("Криптовалюта", 0) + value_rub
 
     for broker in balances.get("brokers", []):
         if broker.get("status") != "ok":
             continue
-        broker_name = broker["broker"]
+        source_label = broker.get("portfolio_name") or broker["broker"]
         for pos in broker.get("positions", []):
             value_rub = pos.get("current_value") or 0
             if value_rub <= 0:
                 continue
             currency = pos.get("currency") or "rub"
             by_currency[currency] = by_currency.get(currency, 0) + value_rub
-            by_source[broker_name] = by_source.get(broker_name, 0) + value_rub
-            sector = pos.get("sector") or "Без сектора"
+            by_source[source_label] = by_source.get(source_label, 0) + value_rub
+            # Fallback для облигаций без сектора
+            sector = pos.get("sector")
+            if not sector:
+                sector = "Облигации" if pos.get("instrument_type") == "bond" else "Без сектора"
             by_sector[sector] = by_sector.get(sector, 0) + value_rub
             asset_class = _ASSET_CLASS_MAP.get(pos.get("instrument_type", ""), "Прочее")
             by_asset_class[asset_class] = by_asset_class.get(asset_class, 0) + value_rub
@@ -145,7 +149,10 @@ def get_sector_detail(balances: dict, usd_rub: float, sector: str) -> SectorDeta
         if broker.get("status") != "ok":
             continue
         for pos in broker.get("positions", []):
-            pos_sector = (pos.get("sector") or "Без сектора").lower()
+            raw_sector = pos.get("sector")
+            if not raw_sector:
+                raw_sector = "Облигации" if pos.get("instrument_type") == "bond" else "Без сектора"
+            pos_sector = raw_sector.lower()
             if pos_sector != target:
                 continue
             value_rub = pos.get("current_value") or 0

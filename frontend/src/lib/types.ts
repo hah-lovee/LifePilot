@@ -112,6 +112,7 @@ export type WalletBalance = {
 export type ExchangeBalance = {
   source_type: "crypto";
   exchange: string;
+  portfolio_name: string;
   status: string;
   balances: WalletBalance[];
   error: string | null;
@@ -134,6 +135,7 @@ export type BrokerPosition = {
 export type BrokerPortfolio = {
   source_type: "broker";
   broker: string;
+  portfolio_name: string;
   account_id: string;
   account_name: string;
   total_value: number;

@@ -71,11 +71,13 @@ export default function InvestmentConnectionsPage() {
   }, []);
 
   const [exchange, setExchange] = useState(EXCHANGES[0]);
+  const [exchangePortfolioName, setExchangePortfolioName] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [secretKey, setSecretKey] = useState("");
   const [passphrase, setPassphrase] = useState("");
 
   const [broker, setBroker] = useState(BROKERS[0]);
+  const [brokerPortfolioName, setBrokerPortfolioName] = useState("");
   const [token, setToken] = useState("");
   const [accountId, setAccountId] = useState("");
 
@@ -86,6 +88,7 @@ export default function InvestmentConnectionsPage() {
     try {
       await api.post("/api/investments/exchanges", {
         exchange,
+        portfolio_name: exchangePortfolioName.trim() || null,
         api_key: apiKey,
         secret_key: secretKey,
         passphrase: passphrase || null,
@@ -93,20 +96,22 @@ export default function InvestmentConnectionsPage() {
       setApiKey("");
       setSecretKey("");
       setPassphrase("");
-      setMessage(`Биржа «${exchange}» подключена`);
+      setExchangePortfolioName("");
+      const displayName = exchangePortfolioName.trim() || exchange;
+      setMessage(`Биржа «${exchange}» (${displayName}) подключена`);
       await loadSummary();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось подключить биржу");
     }
   }
 
-  async function disconnectExchange(name: string) {
-    if (!window.confirm(`Отключить «${name}»? Ключи будут удалены из хранилища.`)) return;
+  async function disconnectExchange(portfolioName: string) {
+    if (!window.confirm(`Отключить портфель «${portfolioName}»? Ключи будут удалены из хранилища.`)) return;
     setError(null);
     setMessage(null);
     try {
-      await api.delete(`/api/investments/exchanges/${name}`);
-      setMessage(`Биржа «${name}» отключена`);
+      await api.delete(`/api/investments/exchanges/${portfolioName}`);
+      setMessage(`Портфель «${portfolioName}» отключён`);
       await loadSummary();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось отключить биржу");
@@ -118,37 +123,45 @@ export default function InvestmentConnectionsPage() {
     setError(null);
     setMessage(null);
     try {
-      await api.post("/api/investments/brokers", { broker, token, account_id: accountId || null });
+      await api.post("/api/investments/brokers", {
+        broker,
+        portfolio_name: brokerPortfolioName.trim() || null,
+        token,
+        account_id: accountId || null,
+      });
       setToken("");
       setAccountId("");
-      setMessage(`Брокер «${broker}» подключён`);
+      setBrokerPortfolioName("");
+      const displayName = brokerPortfolioName.trim() || broker;
+      setMessage(`Брокер «${broker}» (${displayName}) подключён`);
       await loadSummary();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось подключить брокера");
     }
   }
 
-  async function disconnectBroker(name: string) {
-    if (!window.confirm(`Отключить «${name}»? Токен будет удалён из хранилища.`)) return;
+  async function disconnectBroker(portfolioName: string) {
+    if (!window.confirm(`Отключить портфель «${portfolioName}»? Токен будет удалён из хранилища.`)) return;
     setError(null);
     setMessage(null);
     try {
-      await api.delete(`/api/investments/brokers/${name}`);
-      setMessage(`Брокер «${name}» отключён`);
+      await api.delete(`/api/investments/brokers/${portfolioName}`);
+      setMessage(`Портфель «${portfolioName}» отключён`);
       await loadSummary();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось отключить брокера");
     }
   }
 
-  const connectedExchanges = summary?.crypto.map((e) => e.exchange) ?? [];
-  const connectedBrokers = summary?.brokers.map((b) => b.broker) ?? [];
+  const connectedExchanges = summary?.crypto ?? [];
+  const connectedBrokers = summary?.brokers ?? [];
 
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="mb-1.5 text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Подключения</h1>
       <p className="mb-5 max-w-[560px] text-[13px] leading-relaxed text-[var(--color-muted)]">
         Ключи и токены уходят напрямую в защищённое хранилище и не сохраняются в базе Life Pilot.
+        Можно подключить до 5 портфелей на каждую биржу или брокера.
       </p>
       {error && <p className="mb-4 text-sm text-[#b5503e]">{error}</p>}
       {message && <p className="mb-4 text-sm text-[var(--color-accent)]">{message}</p>}
@@ -163,6 +176,17 @@ export default function InvestmentConnectionsPage() {
               </option>
             ))}
           </select>
+          <input
+            type="text"
+            name="exchange-portfolio-name"
+            placeholder={`Название портфеля (по умолчанию «${exchange}»)`}
+            autoComplete="off"
+            data-lpignore="true"
+            data-1p-ignore=""
+            value={exchangePortfolioName}
+            onChange={(e) => setExchangePortfolioName(e.target.value)}
+            className="input-field w-full"
+          />
           <input
             type="text"
             name="exchange-api-key"
@@ -190,11 +214,20 @@ export default function InvestmentConnectionsPage() {
           {connectedExchanges.length === 0 ? (
             <p className="text-[13px] text-[var(--color-faint)]">Биржи пока не подключены.</p>
           ) : (
-            connectedExchanges.map((ex) => (
-              <button key={ex} onClick={() => disconnectExchange(ex)} className="tag-chip">
-                {ex} ×
-              </button>
-            ))
+            connectedExchanges.map((ex) => {
+              const label = ex.portfolio_name && ex.portfolio_name !== ex.exchange
+                ? `${ex.exchange} · ${ex.portfolio_name}`
+                : ex.portfolio_name || ex.exchange;
+              return (
+                <button
+                  key={ex.portfolio_name || ex.exchange}
+                  onClick={() => disconnectExchange(ex.portfolio_name || ex.exchange)}
+                  className="tag-chip"
+                >
+                  {label} ×
+                </button>
+              );
+            })
           )}
         </div>
       </section>
@@ -209,6 +242,17 @@ export default function InvestmentConnectionsPage() {
               </option>
             ))}
           </select>
+          <input
+            type="text"
+            name="broker-portfolio-name"
+            placeholder={`Название портфеля (по умолчанию «${broker}»)`}
+            autoComplete="off"
+            data-lpignore="true"
+            data-1p-ignore=""
+            value={brokerPortfolioName}
+            onChange={(e) => setBrokerPortfolioName(e.target.value)}
+            className="input-field w-full"
+          />
           <SecretInput name="broker-api-token" placeholder="API токен" required value={token} onChange={setToken} />
           <input
             type="text"
@@ -229,11 +273,20 @@ export default function InvestmentConnectionsPage() {
           {connectedBrokers.length === 0 ? (
             <p className="text-[13px] text-[var(--color-faint)]">Брокеры пока не подключены.</p>
           ) : (
-            connectedBrokers.map((b) => (
-              <button key={b} onClick={() => disconnectBroker(b)} className="tag-chip">
-                {b} ×
-              </button>
-            ))
+            connectedBrokers.map((b) => {
+              const label = b.portfolio_name && b.portfolio_name !== b.broker
+                ? `${b.broker} · ${b.portfolio_name}`
+                : b.portfolio_name || b.broker;
+              return (
+                <button
+                  key={b.portfolio_name || b.broker}
+                  onClick={() => disconnectBroker(b.portfolio_name || b.broker)}
+                  className="tag-chip"
+                >
+                  {label} ×
+                </button>
+              );
+            })
           )}
         </div>
       </section>

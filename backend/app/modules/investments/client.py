@@ -30,11 +30,15 @@ def _raise_for_status(resp: requests.Response) -> None:
     raise HTTPException(status_code=resp.status_code, detail=detail)
 
 
-def connect_exchange(user_guid: str, exchange: str, api_key: str, secret_key: str, passphrase: str | None) -> dict:
+def connect_exchange(
+    user_guid: str, exchange: str, api_key: str, secret_key: str,
+    passphrase: str | None, portfolio_name: str | None = None,
+) -> dict:
     resp = _request(
         "post", "/exchanges",
         json={
             "user_guid": user_guid, "exchange": exchange,
+            "portfolio_name": portfolio_name,
             "api_key": api_key, "secret_key": secret_key, "passphrase": passphrase,
         },
         timeout=15,
@@ -43,11 +47,15 @@ def connect_exchange(user_guid: str, exchange: str, api_key: str, secret_key: st
     return resp.json()
 
 
-def update_exchange(user_guid: str, exchange: str, api_key: str, secret_key: str, passphrase: str | None) -> dict:
+def update_exchange(
+    user_guid: str, exchange: str, api_key: str, secret_key: str,
+    passphrase: str | None, portfolio_name: str | None = None,
+) -> dict:
     resp = _request(
         "put", "/exchanges",
         json={
             "user_guid": user_guid, "exchange": exchange,
+            "portfolio_name": portfolio_name,
             "api_key": api_key, "secret_key": secret_key, "passphrase": passphrase,
         },
         timeout=15,
@@ -56,33 +64,47 @@ def update_exchange(user_guid: str, exchange: str, api_key: str, secret_key: str
     return resp.json()
 
 
-def delete_exchange(user_guid: str, exchange: str) -> None:
-    resp = _request("delete", f"/exchanges/{user_guid}/{exchange}", timeout=15)
+def delete_exchange(user_guid: str, portfolio_name: str) -> None:
+    resp = _request("delete", f"/exchanges/{user_guid}/{portfolio_name}", timeout=15)
     _raise_for_status(resp)
 
 
-def connect_broker(user_guid: str, broker: str, token: str, account_id: str | None) -> dict:
+def connect_broker(
+    user_guid: str, broker: str, token: str,
+    account_id: str | None, portfolio_name: str | None = None,
+) -> dict:
     resp = _request(
         "post", "/brokers",
-        json={"user_guid": user_guid, "broker": broker, "token": token, "account_id": account_id},
+        json={
+            "user_guid": user_guid, "broker": broker,
+            "portfolio_name": portfolio_name,
+            "token": token, "account_id": account_id,
+        },
         timeout=15,
     )
     _raise_for_status(resp)
     return resp.json()
 
 
-def update_broker(user_guid: str, broker: str, token: str, account_id: str | None) -> dict:
+def update_broker(
+    user_guid: str, broker: str, token: str,
+    account_id: str | None, portfolio_name: str | None = None,
+) -> dict:
     resp = _request(
         "put", "/brokers",
-        json={"user_guid": user_guid, "broker": broker, "token": token, "account_id": account_id},
+        json={
+            "user_guid": user_guid, "broker": broker,
+            "portfolio_name": portfolio_name,
+            "token": token, "account_id": account_id,
+        },
         timeout=15,
     )
     _raise_for_status(resp)
     return resp.json()
 
 
-def delete_broker(user_guid: str, broker: str) -> None:
-    resp = _request("delete", f"/brokers/{user_guid}/{broker}", timeout=15)
+def delete_broker(user_guid: str, portfolio_name: str) -> None:
+    resp = _request("delete", f"/brokers/{user_guid}/{portfolio_name}", timeout=15)
     _raise_for_status(resp)
 
 
