@@ -22,6 +22,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,6 +55,7 @@ volumes:
   postgres_data:
   caddy_data:
   caddy_config:
+  uploads_data:
 
 # Investments module (existing parser backend) is intentionally not wired in
 # yet — it currently runs as its own 3-container stack (vault -> vault-init ->
