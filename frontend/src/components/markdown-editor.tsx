@@ -42,10 +42,11 @@ export function MarkdownEditor({ value, onChange, placeholder, rows = 12 }: Mark
   const taRef = useRef<HTMLTextAreaElement>(null);
 
   // When content loads from the API (empty → non-empty), switch to preview automatically.
+  // Skip if the textarea is focused — that means the user is typing, not an external load.
   const prevEmptyRef = useRef(value.trim().length === 0);
   useEffect(() => {
     const nowEmpty = value.trim().length === 0;
-    if (prevEmptyRef.current && !nowEmpty) {
+    if (prevEmptyRef.current && !nowEmpty && taRef.current !== document.activeElement) {
       setPreview(true);
     }
     prevEmptyRef.current = nowEmpty;
