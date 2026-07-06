@@ -48,9 +48,13 @@ function computeXIRR(history: NetWorthPoint[]): number | null {
     }
     prevInvested = invested;
   }
+  if (cashflows.length < 1) return null;
   const last = history[history.length - 1];
   cashflows.push({ date: new Date(last.snapshot_date), amount: last.total_value_rub });
-  return calcXIRR(cashflows);
+  const result = calcXIRR(cashflows);
+  // Нет смысла показывать XIRR если данных мало (1-2 снэпшота) или все вложения в одной точке
+  if (result === null || Math.abs(result) > 9999) return null;
+  return result;
 }
 
 const PERIODS = [
