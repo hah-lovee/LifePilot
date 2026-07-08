@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from "recharts";
 import { api, ApiError } from "@/lib/api";
-import type { DayScorePoint, ReportSummary, TagImpact } from "@/lib/types";
+import type { DayScorePoint, ReportSummary, SleepSummary, TagImpact } from "@/lib/types";
 
 export default function ReportsPage() {
   const [summary, setSummary] = useState<ReportSummary | null>(null);
   const [dayScores, setDayScores] = useState<DayScorePoint[]>([]);
   const [tagImpact, setTagImpact] = useState<TagImpact[]>([]);
+  const [sleep, setSleep] = useState<SleepSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -16,11 +17,13 @@ export default function ReportsPage() {
       api.get<ReportSummary>("/api/reports/summary"),
       api.get<DayScorePoint[]>("/api/reports/day-scores"),
       api.get<TagImpact[]>("/api/reports/tag-impact"),
+      api.get<SleepSummary>("/api/reports/sleep"),
     ])
-      .then(([summaryData, dayScoreData, tagImpactData]) => {
+      .then(([summaryData, dayScoreData, tagImpactData, sleepData]) => {
         setSummary(summaryData);
         setDayScores(dayScoreData);
         setTagImpact(tagImpactData);
+        setSleep(sleepData);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки отчётов"));
   }, []);
@@ -29,6 +32,14 @@ export default function ReportsPage() {
     date: point.entry_date.slice(5),
     score: point.day_score,
   }));
+
+  const QUALITY_ORDER = ["отличный", "хороший", "нормальный", "плохой"];
+  const QUALITY_COLORS: Record<string, string> = {
+    отличный: "#3f6b54",
+    хороший: "#4d7a63",
+    нормальный: "#8a6a1a",
+    плохой: "#b5503e",
+  };
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -62,6 +73,108 @@ export default function ReportsPage() {
           </ResponsiveContainer>
         </div>
       </section>
+
+      {/* Сон */}
+      {sleep && sleep.days_with_data > 0 && (
+        <section className="metric-card mb-3.5">
+          <h2 className="mb-3.5 text-sm font-semibold text-[var(--color-ink)]">Сон</h2>
+
+          <div className="mb-4 grid grid-cols-3 gap-3">
+            <div>
+              <p className="text-[11.5px] text-[var(--color-muted)]">Среднее время сна</p>
+              <p className="mt-0.5 text-[22px] font-semibold leading-none text-[var(--color-ink)]">
+                {sleep.avg_sleep_hours?.toFixed(1)}ч
+              </p>
+            </div>
+            <div>
+              <p className="text-[11.5px] text-[var(--color-muted)]">Засыпаю</p>
+              <p className="mt-0.5 text-[22px] font-semibold leading-none text-[var(--color-ink)]">
+                {sleep.avg_bedtime ?? "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11.5px] text-[var(--color-muted)]">Просыпаюсь</p>
+              <p className="mt-0.5 text-[22px] font-semibold leading-none text-[var(--color-ink)]">
+                {sleep.avg_wakeup ?? "—"}
+              </p>
+            </div>
+          </div>
+
+          {/* Влияние качества сна на оценку дня */}
+          <p className="mb-2 text-[12px] font-semibold text-[var(--color-muted)]">
+            Средняя оценка дня по качеству сна
+          </p>
+          <div className="mb-4 flex flex-wrap gap-2">
+            {QUALITY_ORDER.map((q) => {
+              const score = sleep.score_by_quality[q];
+              if (score === null || score === undefined) return null;
+              return (
+                <div key={q} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] px-3 py-2">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                    style={{ background: QUALITY_COLORS[q] }}
+                  />
+                  <span className="text-[12px] text-[var(--color-muted)] capitalize">{q}</span>
+                  <span className="text-[13px] font-semibold text-[var(--color-ink)]">{score.toFixed(1)}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Scatter: часы сна → оценка дня */}
+          {sleep.points.filter((p) => p.day_score !== null).length >= 3 && (
+            <>
+              <p className="mb-2 text-[12px] font-semibold text-[var(--color-muted)]">
+                Часы сна → оценка дня
+              </p>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ScatterChart margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
+                    <XAxis
+                      type="number"
+                      dataKey="sleep_hours"
+                      name="Часы"
+                      domain={[4, 10]}
+                      fontSize={11}
+                      stroke="#9c9c95"
+                      tickLine={false}
+                      axisLine={{ stroke: "#f0f0ec" }}
+                      label={{ value: "часов сна", position: "insideBottom", offset: -2, fontSize: 10, fill: "#9c9c95" }}
+                    />
+                    <YAxis
+                      type="number"
+                      dataKey="day_score"
+                      name="Оценка"
+                      domain={[0, 10]}
+                      fontSize={11}
+                      stroke="#9c9c95"
+                      tickLine={false}
+                      axisLine={false}
+                      width={24}
+                    />
+                    <Tooltip
+                      contentStyle={{ borderRadius: 10, border: "1px solid #e7e7e2", fontSize: 12 }}
+                      formatter={(value: any, name: string) => [
+                        name === "Часы" ? `${value}ч` : value,
+                        name === "Часы" ? "Сон" : "Оценка дня",
+                      ]}
+                    />
+                    <Scatter
+                      data={sleep.points.filter((p) => p.day_score !== null)}
+                      fill="#2d4a5e"
+                      opacity={0.6}
+                    />
+                  </ScatterChart>
+                </ResponsiveContainer>
+              </div>
+            </>
+          )}
+
+          <p className="mt-1 text-[11px] text-[var(--color-faint)]">
+            Данных: {sleep.days_with_data} дн.
+          </p>
+        </section>
+      )}
 
       <section className="metric-card mb-3.5">
         <h2 className="mb-1 text-sm font-semibold text-[var(--color-ink)]">Привычки за 30 дней</h2>

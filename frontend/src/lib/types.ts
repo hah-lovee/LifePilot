@@ -63,6 +63,8 @@ export type DiaryEntry = {
   content: string | null;
   tags: string[];
   day_score: number | null;
+  sleep_bedtime: string | null;
+  sleep_wakeup: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -169,6 +171,21 @@ export type NetWorthPoint = {
   broker_value_rub: number;
   invested_amount_rub: number | null;
   dividends_received_rub: number | null;
+};
+
+export type SleepPoint = {
+  entry_date: string;
+  sleep_hours: number;
+  day_score: number | null;
+};
+
+export type SleepSummary = {
+  avg_sleep_hours: number | null;
+  avg_bedtime: string | null;
+  avg_wakeup: string | null;
+  days_with_data: number;
+  score_by_quality: Record<string, number | null>;
+  points: SleepPoint[];
 };
 
 export type MonthlyIncome = {

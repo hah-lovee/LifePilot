@@ -15,6 +15,8 @@ from app.modules.reports.schemas import (
     HabitSummary,
     HabitTrendPoint,
     ReportSummary,
+    SleepPoint,
+    SleepSummary,
     TagImpact,
 )
 
@@ -84,6 +86,96 @@ def tag_impact(db: Session = Depends(get_db), user: User = Depends(get_current_u
             )
         )
     return results
+
+
+def _parse_time_minutes(t: str) -> int | None:
+    """'HH:MM' → минуты от полуночи."""
+    try:
+        h, m = t.split(":")
+        return int(h) * 60 + int(m)
+    except Exception:
+        return None
+
+
+def _sleep_hours(bedtime: str, wakeup: str) -> float | None:
+    bed = _parse_time_minutes(bedtime)
+    wake = _parse_time_minutes(wakeup)
+    if bed is None or wake is None:
+        return None
+    minutes = (wake - bed) % (24 * 60)
+    return round(minutes / 60, 2)
+
+
+def _minutes_to_hhmm(minutes: float) -> str:
+    total = int(round(minutes)) % (24 * 60)
+    return f"{total // 60:02d}:{total % 60:02d}"
+
+
+def _sleep_quality(hours: float) -> str:
+    if hours >= 8:
+        return "отличный"
+    if hours >= 7:
+        return "хороший"
+    if hours >= 6:
+        return "нормальный"
+    return "плохой"
+
+
+@router.get("/sleep", response_model=SleepSummary)
+def sleep_summary(db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> SleepSummary:
+    entries = (
+        db.query(DiaryEntry)
+        .filter(
+            DiaryEntry.user_id == user.id,
+            DiaryEntry.sleep_bedtime.isnot(None),
+            DiaryEntry.sleep_wakeup.isnot(None),
+        )
+        .order_by(DiaryEntry.entry_date)
+        .all()
+    )
+
+    points: list[SleepPoint] = []
+    all_hours: list[float] = []
+    bed_minutes: list[float] = []
+    wake_minutes: list[float] = []
+    quality_scores: dict[str, list[float]] = {"отличный": [], "хороший": [], "нормальный": [], "плохой": []}
+
+    for e in entries:
+        hours = _sleep_hours(e.sleep_bedtime, e.sleep_wakeup)
+        if hours is None or hours <= 0 or hours > 20:
+            continue
+        all_hours.append(hours)
+        bed_m = _parse_time_minutes(e.sleep_bedtime)
+        wake_m = _parse_time_minutes(e.sleep_wakeup)
+        if bed_m is not None:
+            bed_minutes.append(bed_m if bed_m >= 12 * 60 else bed_m + 24 * 60)
+        if wake_m is not None:
+            wake_minutes.append(wake_m)
+        quality = _sleep_quality(hours)
+        if e.day_score is not None:
+            quality_scores[quality].append(float(e.day_score))
+        points.append(SleepPoint(
+            entry_date=e.entry_date,
+            sleep_hours=hours,
+            day_score=float(e.day_score) if e.day_score is not None else None,
+        ))
+
+    avg_hours = round(sum(all_hours) / len(all_hours), 2) if all_hours else None
+    avg_bed = _minutes_to_hhmm(sum(bed_minutes) / len(bed_minutes)) if bed_minutes else None
+    avg_wake = _minutes_to_hhmm(sum(wake_minutes) / len(wake_minutes)) if wake_minutes else None
+    score_by_quality = {
+        q: round(sum(v) / len(v), 2) if v else None
+        for q, v in quality_scores.items()
+    }
+
+    return SleepSummary(
+        avg_sleep_hours=avg_hours,
+        avg_bedtime=avg_bed,
+        avg_wakeup=avg_wake,
+        days_with_data=len(points),
+        score_by_quality=score_by_quality,
+        points=points,
+    )
 
 
 def _current_streak(log_dates: set[date]) -> int:

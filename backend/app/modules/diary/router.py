@@ -91,6 +91,8 @@ def upsert_entry(
         db.add(entry)
     entry.content = payload.content
     entry.tags = payload.tags
+    entry.sleep_bedtime = payload.sleep_bedtime
+    entry.sleep_wakeup = payload.sleep_wakeup
 
     existing_tag_names = {t.name for t in db.query(DiaryTag).filter(DiaryTag.user_id == user.id)}
     for name in payload.tags:

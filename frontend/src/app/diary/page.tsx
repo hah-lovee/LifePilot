@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState, type FormEvent } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { DateNav } from "@/components/date-nav";
@@ -9,14 +9,32 @@ import type { DiaryEntry, DiaryTag } from "@/lib/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-const DRAFT_KEY = (d: string) => `diary-draft-${d}`;
-
 export default function DiaryPage() {
   return (
     <Suspense>
       <DiaryContent />
     </Suspense>
   );
+}
+
+type SaveStatus = "idle" | "saving" | "saved" | "error";
+
+function sleepHours(bedtime: string, wakeup: string): number | null {
+  const [bh, bm] = bedtime.split(":").map(Number);
+  const [wh, wm] = wakeup.split(":").map(Number);
+  if ([bh, bm, wh, wm].some(isNaN)) return null;
+  const bed = bh * 60 + bm;
+  const wake = wh * 60 + wm;
+  const diff = ((wake - bed) + 24 * 60) % (24 * 60);
+  if (diff === 0 || diff > 20 * 60) return null;
+  return Math.round(diff / 6) / 10;
+}
+
+function sleepLabel(hours: number): string {
+  if (hours >= 8) return "отличный";
+  if (hours >= 7) return "хороший";
+  if (hours >= 6) return "нормальный";
+  return "плохой";
 }
 
 function DiaryContent() {
@@ -34,13 +52,14 @@ function DiaryContent() {
   const [availableTags, setAvailableTags] = useState<DiaryTag[]>([]);
   const [newTagName, setNewTagName] = useState("");
   const [dayScore, setDayScore] = useState<number | null>(null);
+  const [sleepBedtime, setSleepBedtime] = useState("");
+  const [sleepWakeup, setSleepWakeup] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [draftRestored, setDraftRestored] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
 
-  // Tracks whether the initial load for the current date has completed.
-  // Prevents the auto-save effect from writing an empty draft before the entry loads.
   const loadedRef = useRef(false);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedRef = useRef<string>("");
 
   async function loadTags() {
     setAvailableTags(await api.get<DiaryTag[]>("/api/diary/tags"));
@@ -48,33 +67,24 @@ function DiaryContent() {
 
   async function loadEntry(targetDate: string) {
     loadedRef.current = false;
-    setDraftRestored(false);
+    setSaveStatus("idle");
     setError(null);
     try {
       const entry = await api.get<DiaryEntry>(`/api/diary/${targetDate}`);
       setContent(entry.content ?? "");
       setSelectedTags(entry.tags);
       setDayScore(entry.day_score);
-      // Backend has the canonical version — discard any local draft.
-      localStorage.removeItem(DRAFT_KEY(targetDate));
+      setSleepBedtime(entry.sleep_bedtime ?? "");
+      setSleepWakeup(entry.sleep_wakeup ?? "");
+      lastSavedRef.current = stateKey(entry.content ?? "", entry.tags, entry.sleep_bedtime ?? "", entry.sleep_wakeup ?? "");
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
-        const raw = localStorage.getItem(DRAFT_KEY(targetDate));
-        if (raw) {
-          try {
-            const draft = JSON.parse(raw) as { content: string; tags: string[] };
-            setContent(draft.content);
-            setSelectedTags(draft.tags);
-            setDraftRestored(true);
-          } catch {
-            setContent("");
-            setSelectedTags([]);
-          }
-        } else {
-          setContent("");
-          setSelectedTags([]);
-        }
+        setContent("");
+        setSelectedTags([]);
         setDayScore(null);
+        setSleepBedtime("");
+        setSleepWakeup("");
+        lastSavedRef.current = stateKey("", [], "", "");
       } else {
         setError(err instanceof ApiError ? err.message : "Ошибка загрузки записи");
       }
@@ -91,11 +101,41 @@ function DiaryContent() {
     loadEntry(date);
   }, [date]);
 
-  // Auto-save draft on every content/tags change, but only after the entry has loaded.
+  function stateKey(c: string, t: string[], bed: string, wake: string) {
+    return JSON.stringify({ c, t, bed, wake });
+  }
+
+  const doSave = useCallback(async (c: string, t: string[], bed: string, wake: string) => {
+    const key = stateKey(c, t, bed, wake);
+    if (key === lastSavedRef.current) return;
+    setSaveStatus("saving");
+    try {
+      const entry = await api.put<DiaryEntry>("/api/diary", {
+        entry_date: date,
+        content: c,
+        tags: t,
+        sleep_bedtime: bed || null,
+        sleep_wakeup: wake || null,
+      });
+      setDayScore(entry.day_score);
+      lastSavedRef.current = key;
+      setSaveStatus("saved");
+    } catch {
+      setSaveStatus("error");
+    }
+  }, [date]);
+
+  // Debounced autosave — 1.5s after last change
   useEffect(() => {
     if (!loadedRef.current) return;
-    localStorage.setItem(DRAFT_KEY(date), JSON.stringify({ content, tags: selectedTags }));
-  }, [content, selectedTags, date]);
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      doSave(content, selectedTags, sleepBedtime, sleepWakeup);
+    }, 1500);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [content, selectedTags, sleepBedtime, sleepWakeup, doSave]);
 
   function toggleTag(name: string) {
     setSelectedTags((prev) => (prev.includes(name) ? prev.filter((t) => t !== name) : [...prev, name]));
@@ -118,19 +158,11 @@ function DiaryContent() {
 
   async function onSave(e: FormEvent) {
     e.preventDefault();
-    setIsSaving(true);
-    setError(null);
-    try {
-      const entry = await api.put<DiaryEntry>("/api/diary", { entry_date: date, content, tags: selectedTags });
-      setDayScore(entry.day_score);
-      localStorage.removeItem(DRAFT_KEY(date));
-      setDraftRestored(false);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Не удалось сохранить запись");
-    } finally {
-      setIsSaving(false);
-    }
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    await doSave(content, selectedTags, sleepBedtime, sleepWakeup);
   }
+
+  const hours = sleepBedtime && sleepWakeup ? sleepHours(sleepBedtime, sleepWakeup) : null;
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -138,24 +170,6 @@ function DiaryContent() {
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Запись</h1>
         <DateNav date={date} onChange={changeDate} />
       </div>
-
-      {draftRestored && (
-        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-[#e4d6b6] bg-[#f4eddc] px-3.5 py-2.5 text-[13px] text-[#8a6a1a]">
-          <span>Восстановлен несохранённый черновик</span>
-          <button
-            type="button"
-            onClick={() => {
-              localStorage.removeItem(DRAFT_KEY(date));
-              setContent("");
-              setSelectedTags([]);
-              setDraftRestored(false);
-            }}
-            className="ml-auto text-[12px] underline opacity-70 hover:opacity-100"
-          >
-            Очистить
-          </button>
-        </div>
-      )}
 
       {dayScore !== null && (
         <div className="day-score-badge mb-4">
@@ -182,6 +196,52 @@ function DiaryContent() {
           rows={10}
         />
 
+        {/* Сон */}
+        <div className="card p-4">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-faint)]">Сон</p>
+          <div className="flex flex-wrap items-end gap-4">
+            <label className="flex flex-col gap-1">
+              <span className="text-[12px] text-[var(--color-muted)]">Лёг в</span>
+              <input
+                type="time"
+                value={sleepBedtime}
+                onChange={(e) => setSleepBedtime(e.target.value)}
+                className="input-field w-[120px] rounded-lg py-1.5 text-[13px]"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[12px] text-[var(--color-muted)]">Встал в</span>
+              <input
+                type="time"
+                value={sleepWakeup}
+                onChange={(e) => setSleepWakeup(e.target.value)}
+                className="input-field w-[120px] rounded-lg py-1.5 text-[13px]"
+              />
+            </label>
+            {hours !== null && (
+              <div className="flex items-center gap-2 pb-1">
+                <span className="text-[22px] font-semibold leading-none text-[var(--color-ink)]">
+                  {hours.toFixed(1)}ч
+                </span>
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
+                    hours >= 8
+                      ? "bg-[#e6eee7] text-[#3f6b54]"
+                      : hours >= 7
+                      ? "bg-[#edf4f0] text-[#4d7a63]"
+                      : hours >= 6
+                      ? "bg-[#f4eddc] text-[#8a6a1a]"
+                      : "bg-[#f4e2dd] text-[#b5503e]"
+                  }`}
+                >
+                  {sleepLabel(hours)}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Теги */}
         <div className="card p-4">
           <p className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-faint)]">
             Теги дня
@@ -220,10 +280,16 @@ function DiaryContent() {
         </div>
 
         {error && <p className="text-sm text-[#b5503e]">{error}</p>}
-        <div className="flex gap-2.5">
-          <button type="submit" disabled={isSaving} className="btn-primary self-start">
+
+        <div className="flex items-center gap-3">
+          <button type="submit" className="btn-primary self-start">
             Сохранить
           </button>
+          <span className="text-[12px] text-[var(--color-faint)]">
+            {saveStatus === "saving" && "Сохраняется..."}
+            {saveStatus === "saved" && "✓ Сохранено"}
+            {saveStatus === "error" && "Ошибка сохранения"}
+          </span>
         </div>
       </form>
     </div>

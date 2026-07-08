@@ -7,6 +7,8 @@ class DiaryEntryUpsert(BaseModel):
     entry_date: date
     content: str | None = None
     tags: list[str] = []
+    sleep_bedtime: str | None = None  # "HH:MM"
+    sleep_wakeup: str | None = None   # "HH:MM"
 
 
 class DiaryEntryOut(BaseModel):
@@ -15,6 +17,8 @@ class DiaryEntryOut(BaseModel):
     content: str | None
     tags: list[str]
     day_score: float | None
+    sleep_bedtime: str | None
+    sleep_wakeup: str | None
     created_at: datetime
     updated_at: datetime
 

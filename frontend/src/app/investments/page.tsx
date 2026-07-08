@@ -71,10 +71,12 @@ export default function InvestmentsPage() {
   const [summary, setSummary] = useState<InvestmentsSummary | null>(
     () => getStaleData<InvestmentsSummary>(SUMMARY_CACHE_KEY)
   );
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<(typeof PERIODS)[number]["label"]>("Всё");
 
   useEffect(() => {
+    setLoading(true);
     Promise.all([
       api.get<NetWorthPoint[]>("/api/investments/net-worth"),
       api.get<InvestmentsSummary>("/api/investments/summary"),
@@ -84,7 +86,8 @@ export default function InvestmentsPage() {
         setSummary(s);
         setCachedData(SUMMARY_CACHE_KEY, s);
       })
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки портфеля"));
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки портфеля"))
+      .finally(() => setLoading(false));
   }, []);
 
   const days = PERIODS.find((p) => p.label === period)?.days ?? 0;
@@ -136,6 +139,10 @@ export default function InvestmentsPage() {
   })();
 
   const hasConnections = summary && (summary.crypto.length > 0 || summary.brokers.length > 0);
+
+  if (loading && !summary) {
+    return <InvestmentsLoadingSkeleton />;
+  }
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -342,6 +349,40 @@ export default function InvestmentsPage() {
           </section>
         );
       })}
+    </div>
+  );
+}
+
+function Skeleton({ className }: { className?: string }) {
+  return <div className={`animate-pulse rounded bg-[#f0f0ec] ${className ?? ""}`} />;
+}
+
+function InvestmentsLoadingSkeleton() {
+  return (
+    <div className="mx-auto max-w-3xl">
+      <h1 className="mb-5 text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Портфель</h1>
+      <div className="mb-3.5 grid grid-cols-2 gap-3.5 sm:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="metric-card flex flex-col gap-2">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-7 w-32" />
+          </div>
+        ))}
+      </div>
+      <div className="metric-card mb-3.5">
+        <Skeleton className="mb-3.5 h-4 w-40" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+      <div className="metric-card mb-3.5">
+        <Skeleton className="mb-3 h-4 w-32" />
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="flex justify-between border-b border-[#f5f5f1] py-2.5">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-4 w-16" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

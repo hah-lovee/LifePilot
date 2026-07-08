@@ -53,6 +53,8 @@ class DiaryEntry(Base):
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
     tags: Mapped[list[str]] = mapped_column(ARRAY(String(60)), default=list, server_default="{}")
     day_score: Mapped[float | None] = mapped_column(Numeric(4, 2), nullable=True)
+    sleep_bedtime: Mapped[str | None] = mapped_column(String(5), nullable=True)  # "HH:MM" когда лёг
+    sleep_wakeup: Mapped[str | None] = mapped_column(String(5), nullable=True)   # "HH:MM" когда встал
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
