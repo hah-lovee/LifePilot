@@ -154,7 +154,7 @@ export default function ReportsPage() {
                     />
                     <Tooltip
                       contentStyle={{ borderRadius: 10, border: "1px solid #e7e7e2", fontSize: 12 }}
-                      formatter={(value: any, name: string) => [
+                      formatter={(value: any, name: any) => [
                         name === "Часы" ? `${value}ч` : value,
                         name === "Часы" ? "Сон" : "Оценка дня",
                       ]}
