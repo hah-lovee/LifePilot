@@ -19,24 +19,6 @@ export default function DiaryPage() {
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
-function sleepHours(bedtime: string, wakeup: string): number | null {
-  const [bh, bm] = bedtime.split(":").map(Number);
-  const [wh, wm] = wakeup.split(":").map(Number);
-  if ([bh, bm, wh, wm].some(isNaN)) return null;
-  const bed = bh * 60 + bm;
-  const wake = wh * 60 + wm;
-  const diff = ((wake - bed) + 24 * 60) % (24 * 60);
-  if (diff === 0 || diff > 20 * 60) return null;
-  return Math.round(diff / 6) / 10;
-}
-
-function sleepLabel(hours: number): string {
-  if (hours >= 8) return "отличный";
-  if (hours >= 7) return "хороший";
-  if (hours >= 6) return "нормальный";
-  return "плохой";
-}
-
 function DiaryContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -162,8 +144,6 @@ function DiaryContent() {
     await doSave(content, selectedTags, sleepBedtime, sleepWakeup);
   }
 
-  const hours = sleepBedtime && sleepWakeup ? sleepHours(sleepBedtime, sleepWakeup) : null;
-
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -201,15 +181,6 @@ function DiaryContent() {
           <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-faint)]">Сон</p>
           <div className="flex flex-wrap items-end gap-4">
             <label className="flex flex-col gap-1">
-              <span className="text-[12px] text-[var(--color-muted)]">Лёг в</span>
-              <input
-                type="time"
-                value={sleepBedtime}
-                onChange={(e) => setSleepBedtime(e.target.value)}
-                className="input-field w-[120px] rounded-lg py-1.5 text-[13px]"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
               <span className="text-[12px] text-[var(--color-muted)]">Встал в</span>
               <input
                 type="time"
@@ -217,28 +188,22 @@ function DiaryContent() {
                 onChange={(e) => setSleepWakeup(e.target.value)}
                 className="input-field w-[120px] rounded-lg py-1.5 text-[13px]"
               />
+              <span className="text-[11px] text-[var(--color-faint)]">утро этого дня</span>
             </label>
-            {hours !== null && (
-              <div className="flex items-center gap-2 pb-1">
-                <span className="text-[22px] font-semibold leading-none text-[var(--color-ink)]">
-                  {hours.toFixed(1)}ч
-                </span>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
-                    hours >= 8
-                      ? "bg-[#e6eee7] text-[#3f6b54]"
-                      : hours >= 7
-                      ? "bg-[#edf4f0] text-[#4d7a63]"
-                      : hours >= 6
-                      ? "bg-[#f4eddc] text-[#8a6a1a]"
-                      : "bg-[#f4e2dd] text-[#b5503e]"
-                  }`}
-                >
-                  {sleepLabel(hours)}
-                </span>
-              </div>
-            )}
+            <label className="flex flex-col gap-1">
+              <span className="text-[12px] text-[var(--color-muted)]">Лёг в</span>
+              <input
+                type="time"
+                value={sleepBedtime}
+                onChange={(e) => setSleepBedtime(e.target.value)}
+                className="input-field w-[120px] rounded-lg py-1.5 text-[13px]"
+              />
+              <span className="text-[11px] text-[var(--color-faint)]">вечер этого дня</span>
+            </label>
           </div>
+          <p className="mt-2.5 text-[11px] text-[var(--color-faint)]">
+            Длительность сна считается по «Лёг в» предыдущего дня и «Встал в» этого дня
+          </p>
         </div>
 
         {/* Теги */}

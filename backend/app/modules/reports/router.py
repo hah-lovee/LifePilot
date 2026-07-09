@@ -127,12 +127,13 @@ def sleep_summary(db: Session = Depends(get_db), user: User = Depends(get_curren
         db.query(DiaryEntry)
         .filter(
             DiaryEntry.user_id == user.id,
-            DiaryEntry.sleep_bedtime.isnot(None),
-            DiaryEntry.sleep_wakeup.isnot(None),
         )
         .order_by(DiaryEntry.entry_date)
         .all()
     )
+
+    # Sleep for day D = bedtime from entry D-1 + wakeup from entry D
+    entries_by_date = {e.entry_date: e for e in entries}
 
     points: list[SleepPoint] = []
     all_hours: list[float] = []
@@ -141,11 +142,17 @@ def sleep_summary(db: Session = Depends(get_db), user: User = Depends(get_curren
     quality_scores: dict[str, list[float]] = {"отличный": [], "хороший": [], "нормальный": [], "плохой": []}
 
     for e in entries:
-        hours = _sleep_hours(e.sleep_bedtime, e.sleep_wakeup)
+        if not e.sleep_wakeup:
+            continue
+        prev_date = e.entry_date - timedelta(days=1)
+        prev_entry = entries_by_date.get(prev_date)
+        if prev_entry is None or not prev_entry.sleep_bedtime:
+            continue
+        hours = _sleep_hours(prev_entry.sleep_bedtime, e.sleep_wakeup)
         if hours is None or hours <= 0 or hours > 20:
             continue
         all_hours.append(hours)
-        bed_m = _parse_time_minutes(e.sleep_bedtime)
+        bed_m = _parse_time_minutes(prev_entry.sleep_bedtime)
         wake_m = _parse_time_minutes(e.sleep_wakeup)
         if bed_m is not None:
             bed_minutes.append(bed_m if bed_m >= 12 * 60 else bed_m + 24 * 60)
