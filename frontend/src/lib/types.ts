@@ -101,6 +101,7 @@ export type DayScorePoint = {
   energy: number | null;
   mood: number | null;
   body_condition: number | null;
+  sleep_score: number | null;
 };
 
 export type TagImpact = {

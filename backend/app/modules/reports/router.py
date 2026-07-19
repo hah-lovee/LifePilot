@@ -30,13 +30,39 @@ def day_scores(
     date_to: date | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-) -> list[DiaryEntry]:
-    query = db.query(DiaryEntry).filter(DiaryEntry.user_id == user.id)
-    if date_from:
-        query = query.filter(DiaryEntry.entry_date >= date_from)
-    if date_to:
-        query = query.filter(DiaryEntry.entry_date <= date_to)
-    return query.order_by(DiaryEntry.entry_date).all()
+) -> list[DayScorePoint]:
+    # Sleep for a day needs the PREVIOUS day's bedtime, so fetch full history for
+    # the lookup regardless of date_from/date_to, then only return points in range.
+    all_entries = (
+        db.query(DiaryEntry).filter(DiaryEntry.user_id == user.id).order_by(DiaryEntry.entry_date).all()
+    )
+    entries_by_date = {e.entry_date: e for e in all_entries}
+
+    points: list[DayScorePoint] = []
+    for entry in all_entries:
+        if date_from and entry.entry_date < date_from:
+            continue
+        if date_to and entry.entry_date > date_to:
+            continue
+
+        sleep_score = None
+        prev_entry = entries_by_date.get(entry.entry_date - timedelta(days=1))
+        if prev_entry and prev_entry.sleep_bedtime and entry.sleep_wakeup:
+            hours = _sleep_hours(prev_entry.sleep_bedtime, entry.sleep_wakeup)
+            if hours is not None and 0 < hours <= 20:
+                sleep_score = _sleep_score(hours)
+
+        points.append(
+            DayScorePoint(
+                entry_date=entry.entry_date,
+                day_score=float(entry.day_score) if entry.day_score is not None else None,
+                energy=entry.energy,
+                mood=entry.mood,
+                body_condition=entry.body_condition,
+                sleep_score=sleep_score,
+            )
+        )
+    return points
 
 
 @router.get("/habits/{habit_id}/trend", response_model=list[HabitTrendPoint])
@@ -120,6 +146,17 @@ def _sleep_quality(hours: float) -> str:
     if hours >= 6:
         return "нормальный"
     return "плохой"
+
+
+# Эталонное время сна = 10/10; оценка падает на 2 балла за каждый час
+# отклонения в любую сторону (недосып и пересып одинаково снижают оценку).
+OPTIMAL_SLEEP_HOURS = 8.0
+SLEEP_PENALTY_PER_HOUR = 2.0
+
+
+def _sleep_score(hours: float) -> float:
+    score = 10.0 - SLEEP_PENALTY_PER_HOUR * abs(hours - OPTIMAL_SLEEP_HOURS)
+    return round(max(0.0, min(10.0, score)), 1)
 
 
 @router.get("/sleep", response_model=SleepSummary)

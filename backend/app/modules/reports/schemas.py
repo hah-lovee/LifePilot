@@ -9,6 +9,7 @@ class DayScorePoint(BaseModel):
     energy: int | None = None
     mood: int | None = None
     body_condition: int | None = None
+    sleep_score: float | None = None
 
 
 class HabitTrendPoint(BaseModel):

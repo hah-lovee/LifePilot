@@ -34,13 +34,21 @@ export default function ReportsPage() {
   }));
 
   const stateChartData = dayScores
-    .filter((p) => p.energy !== null || p.mood !== null || p.body_condition !== null)
-    .map((point) => ({
-      date: point.entry_date.slice(5),
-      energy: point.energy,
-      mood: point.mood,
-      body_condition: point.body_condition,
-    }));
+    .filter((p) => p.energy !== null || p.mood !== null || p.body_condition !== null || p.sleep_score !== null)
+    .map((point) => {
+      const values = [point.energy, point.mood, point.body_condition, point.sleep_score].filter(
+        (v): v is number => v !== null
+      );
+      const average = values.length > 0 ? values.reduce((s, v) => s + v, 0) / values.length : null;
+      return {
+        date: point.entry_date.slice(5),
+        energy: point.energy,
+        mood: point.mood,
+        body_condition: point.body_condition,
+        sleep_score: point.sleep_score,
+        average,
+      };
+    });
 
   const QUALITY_ORDER = ["отличный", "хороший", "нормальный", "плохой"];
   const QUALITY_COLORS: Record<string, string> = {
@@ -115,6 +123,25 @@ export default function ReportsPage() {
                     stroke="#3f6b54"
                     strokeWidth={2}
                     dot={{ r: 2 }}
+                    connectNulls
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="sleep_score"
+                    name="Сон"
+                    stroke="#7a6ea3"
+                    strokeWidth={2}
+                    dot={{ r: 2 }}
+                    connectNulls
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="average"
+                    name="Среднее"
+                    stroke="#b5503e"
+                    strokeWidth={2.5}
+                    strokeDasharray="4 3"
+                    dot={false}
                     connectNulls
                   />
                 </LineChart>
