@@ -1,10 +1,20 @@
 import logging
+import socket
 
 import requests
+import urllib3.util.connection as urllib3_cn
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# This container's IPv6 route is advertised but doesn't actually deliver
+# packets (confirmed: connect() to a known-reachable IPv6 host fails with
+# "Network is unreachable"), while IPv4 works fine. api.telegram.org resolves
+# to both families, and urllib3 doesn't reliably fall back to IPv4 after an
+# immediate IPv6 connect failure, so force IPv4 for all outbound requests in
+# this process rather than resolving/connecting via the broken IPv6 route.
+urllib3_cn.allowed_gai_family = lambda: socket.AF_INET
 
 
 def _api_url(method: str) -> str:
