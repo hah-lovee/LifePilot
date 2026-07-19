@@ -14,6 +14,42 @@ function formatPct(value: number): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
 }
 
+function Skeleton({ className }: { className?: string }) {
+  return <div className={`animate-pulse rounded bg-[#f0f0ec] ${className ?? ""}`} />;
+}
+
+function AssetLoadingSkeleton() {
+  return (
+    <>
+      <div className="mb-3.5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="metric-card flex flex-col gap-2">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-5 w-16" />
+          </div>
+        ))}
+      </div>
+      <div className="mb-3.5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="metric-card flex flex-col gap-2">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-5 w-14" />
+          </div>
+        ))}
+      </div>
+      <div className="metric-card">
+        <Skeleton className="mb-3 h-4 w-40" />
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex justify-between border-b border-[#f5f5f1] py-2.5">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-24" />
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 const INSTRUMENT_LABELS: Record<string, string> = {
   share: "Акция",
   bond: "Облигация",
@@ -71,9 +107,7 @@ export default function AssetDetailPage() {
 
       {error && <p className="mb-4 text-sm text-[#b5503e]">{error}</p>}
 
-      {!asset && !error && (
-        <p className="text-[var(--color-faint)]">Загрузка…</p>
-      )}
+      {!asset && !error && <AssetLoadingSkeleton />}
 
       {asset && (
         <>

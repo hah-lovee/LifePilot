@@ -9,6 +9,38 @@ function formatRub(value: number): string {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value);
 }
 
+function Skeleton({ className }: { className?: string }) {
+  return <div className={`animate-pulse rounded bg-[#f0f0ec] ${className ?? ""}`} />;
+}
+
+function DividendsLoadingSkeleton() {
+  return (
+    <>
+      <div className="mb-3.5 grid grid-cols-3 gap-3.5">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="metric-card flex flex-col gap-2">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-6 w-24" />
+          </div>
+        ))}
+      </div>
+      <div className="metric-card mb-3.5">
+        <Skeleton className="mb-3.5 h-4 w-56" />
+        <Skeleton className="h-48 w-full" />
+      </div>
+      <div className="metric-card">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="flex justify-between border-b border-[#f5f5f1] py-2.5">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-16" />
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 const MONTH_NAMES: Record<string, string> = {
   "01": "Янв", "02": "Фев", "03": "Мар", "04": "Апр",
   "05": "Май", "06": "Июн", "07": "Июл", "08": "Авг",
@@ -22,6 +54,7 @@ export default function InvestmentDividendsPage() {
   const [monthly, setMonthly] = useState<MonthlyIncome[]>(
     () => getStaleData<MonthlyIncome[]>("investments_monthly") ?? []
   );
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,7 +68,8 @@ export default function InvestmentDividendsPage() {
         setCachedData("investments_dividends", evs);
         setCachedData("investments_monthly", mo);
       })
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки дивидендов"));
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки дивидендов"))
+      .finally(() => setLoading(false));
   }, []);
 
   const annualTotal = monthly.reduce((s, m) => s + m.total_rub, 0);
@@ -58,6 +92,8 @@ export default function InvestmentDividendsPage() {
         Предстоящие выплаты по текущим позициям брокерского счёта на 365 дней вперёд.
       </p>
       {error && <p className="mb-4 text-sm text-[#b5503e]">{error}</p>}
+
+      {loading && events.length === 0 && monthly.length === 0 && <DividendsLoadingSkeleton />}
 
       {/* Сводные карточки */}
       {annualTotal > 0 && (
@@ -133,6 +169,7 @@ export default function InvestmentDividendsPage() {
       )}
 
       {/* Таблица */}
+      {!(loading && events.length === 0 && monthly.length === 0) && (
       <section className="metric-card">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -177,6 +214,7 @@ export default function InvestmentDividendsPage() {
           </table>
         </div>
       </section>
+      )}
     </div>
   );
 }

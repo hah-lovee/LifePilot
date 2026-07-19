@@ -57,17 +57,24 @@ function SecretInput({
   );
 }
 
+function Skeleton({ className }: { className?: string }) {
+  return <div className={`animate-pulse rounded bg-[#f0f0ec] ${className ?? ""}`} />;
+}
+
 export default function InvestmentConnectionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [summary, setSummary] = useState<InvestmentsSummary | null>(null);
+  const [loading, setLoading] = useState(true);
 
   async function loadSummary() {
     setSummary(await api.get<InvestmentsSummary>("/api/investments/summary"));
   }
 
   useEffect(() => {
-    loadSummary().catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки подключений"));
+    loadSummary()
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки подключений"))
+      .finally(() => setLoading(false));
   }, []);
 
   const [exchange, setExchange] = useState(EXCHANGES[0]);
@@ -211,7 +218,12 @@ export default function InvestmentConnectionsPage() {
           </button>
         </form>
         <div className="mt-3 flex flex-wrap gap-2">
-          {connectedExchanges.length === 0 ? (
+          {loading ? (
+            <>
+              <Skeleton className="h-7 w-24 rounded-full" />
+              <Skeleton className="h-7 w-20 rounded-full" />
+            </>
+          ) : connectedExchanges.length === 0 ? (
             <p className="text-[13px] text-[var(--color-faint)]">Биржи пока не подключены.</p>
           ) : (
             connectedExchanges.map((ex) => {
@@ -270,7 +282,9 @@ export default function InvestmentConnectionsPage() {
           </button>
         </form>
         <div className="mt-3 flex flex-wrap gap-2">
-          {connectedBrokers.length === 0 ? (
+          {loading ? (
+            <Skeleton className="h-7 w-24 rounded-full" />
+          ) : connectedBrokers.length === 0 ? (
             <p className="text-[13px] text-[var(--color-faint)]">Брокеры пока не подключены.</p>
           ) : (
             connectedBrokers.map((b) => {

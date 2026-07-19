@@ -12,11 +12,29 @@ function formatRub(value: number): string {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value);
 }
 
+function Skeleton({ className }: { className?: string }) {
+  return <div className={`animate-pulse rounded bg-[#f0f0ec] ${className ?? ""}`} />;
+}
+
+function DiversificationLoadingSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="metric-card">
+          <Skeleton className="mb-3 h-4 w-32" />
+          <Skeleton className="mx-auto h-52 w-52 rounded-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function InvestmentDiversificationPage() {
   const router = useRouter();
   const [data, setData] = useState<DiversificationBreakdown | null>(
     () => getStaleData<DiversificationBreakdown>("investments_diversification")
   );
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Drill-down по сектору
@@ -29,7 +47,8 @@ export default function InvestmentDiversificationPage() {
     api
       .get<DiversificationBreakdown>("/api/investments/diversification")
       .then((d) => { setData(d); setCachedData("investments_diversification", d); })
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки диверсификации"));
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки диверсификации"))
+      .finally(() => setLoading(false));
   }, []);
 
   function openSector(sector: string) {
@@ -59,7 +78,10 @@ export default function InvestmentDiversificationPage() {
     <div className="mx-auto max-w-3xl">
       <h1 className="mb-5 text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Диверсификация</h1>
       {error && <p className="mb-4 text-sm text-[#b5503e]">{error}</p>}
-      {isEmpty && (
+
+      {loading && !data && <DiversificationLoadingSkeleton />}
+
+      {!loading && isEmpty && (
         <p className="text-[var(--color-faint)]">
           Нет данных — подключите биржу или брокера на вкладке «Подключения».
         </p>
@@ -99,7 +121,13 @@ export default function InvestmentDiversificationPage() {
             </button>
           </div>
 
-          {sectorLoading && <p className="text-[13px] text-[var(--color-faint)]">Загрузка…</p>}
+          {sectorLoading && (
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-6 w-full" />
+              ))}
+            </div>
+          )}
           {sectorError && <p className="text-sm text-[#b5503e]">{sectorError}</p>}
 
           {sectorDetail && (
