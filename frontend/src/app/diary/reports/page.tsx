@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from "recharts";
+import { Legend, Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from "recharts";
 import { api, ApiError } from "@/lib/api";
 import type { DayScorePoint, ReportSummary, SleepSummary, TagImpact } from "@/lib/types";
 
@@ -32,6 +32,15 @@ export default function ReportsPage() {
     date: point.entry_date.slice(5),
     score: point.day_score,
   }));
+
+  const stateChartData = dayScores
+    .filter((p) => p.energy !== null || p.mood !== null || p.body_condition !== null)
+    .map((point) => ({
+      date: point.entry_date.slice(5),
+      energy: point.energy,
+      mood: point.mood,
+      body_condition: point.body_condition,
+    }));
 
   const QUALITY_ORDER = ["отличный", "хороший", "нормальный", "плохой"];
   const QUALITY_COLORS: Record<string, string> = {
@@ -73,6 +82,51 @@ export default function ReportsPage() {
           </ResponsiveContainer>
         </div>
       </section>
+
+      {/* Состояние: энергия, настроение, самочувствие */}
+      {summary && (
+        <section className="metric-card mb-3.5">
+          <h2 className="mb-3.5 text-sm font-semibold text-[var(--color-ink)]">Состояние</h2>
+
+          <div className="mb-3.5 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+            <StateStat label="Энергия · 7 / 30 дней" v7={summary.state.avg_energy_7d} v30={summary.state.avg_energy_30d} />
+            <StateStat label="Настроение · 7 / 30 дней" v7={summary.state.avg_mood_7d} v30={summary.state.avg_mood_30d} />
+            <StateStat
+              label="Самочувствие · 7 / 30 дней"
+              v7={summary.state.avg_body_condition_7d}
+              v30={summary.state.avg_body_condition_30d}
+            />
+          </div>
+
+          {stateChartData.length > 0 ? (
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={stateChartData}>
+                  <XAxis dataKey="date" fontSize={11} stroke="#9c9c95" tickLine={false} axisLine={{ stroke: "#f0f0ec" }} />
+                  <YAxis domain={[0, 10]} fontSize={11} stroke="#9c9c95" tickLine={false} axisLine={false} width={24} />
+                  <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid #e7e7e2", fontSize: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line type="monotone" dataKey="energy" name="Энергия" stroke="#2d4a5e" strokeWidth={2} dot={{ r: 2 }} connectNulls />
+                  <Line type="monotone" dataKey="mood" name="Настроение" stroke="#9c7a33" strokeWidth={2} dot={{ r: 2 }} connectNulls />
+                  <Line
+                    type="monotone"
+                    dataKey="body_condition"
+                    name="Самочувствие"
+                    stroke="#3f6b54"
+                    strokeWidth={2}
+                    dot={{ r: 2 }}
+                    connectNulls
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p className="text-[var(--color-faint)]">
+              Пока нет данных — заполняй вкладку «Состояние» в дневнике.
+            </p>
+          )}
+        </section>
+      )}
 
       {/* Сон */}
       {sleep && sleep.days_with_data > 0 && (
@@ -279,6 +333,23 @@ function Stat({ label, value }: { label: string; value: number | null | undefine
           {value?.toFixed(1) ?? "—"}
         </span>
         <span className="text-[15px] font-normal text-[var(--color-faint)]">/ 10</span>
+      </div>
+    </div>
+  );
+}
+
+function StateStat({ label, v7, v30 }: { label: string; v7: number | null; v30: number | null }) {
+  return (
+    <div className="metric-card">
+      <p className="text-[12.5px] text-[var(--color-muted)]">{label}</p>
+      <div className="mt-1.5 flex items-baseline gap-2">
+        <span className="text-[22px] font-semibold leading-none tracking-tight text-[var(--color-ink)]">
+          {v7?.toFixed(1) ?? "—"}
+        </span>
+        <span className="text-[13px] text-[var(--color-faint)]">/</span>
+        <span className="text-[16px] font-medium leading-none text-[var(--color-muted)]">
+          {v30?.toFixed(1) ?? "—"}
+        </span>
       </div>
     </div>
   );

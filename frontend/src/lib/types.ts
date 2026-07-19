@@ -65,6 +65,9 @@ export type DiaryEntry = {
   day_score: number | null;
   sleep_bedtime: string | null;
   sleep_wakeup: string | null;
+  energy: number | null;
+  mood: number | null;
+  body_condition: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -76,15 +79,28 @@ export type HabitSummary = {
   current_streak_days: number;
 };
 
+export type StateSummary = {
+  avg_energy_7d: number | null;
+  avg_energy_30d: number | null;
+  avg_mood_7d: number | null;
+  avg_mood_30d: number | null;
+  avg_body_condition_7d: number | null;
+  avg_body_condition_30d: number | null;
+};
+
 export type ReportSummary = {
   avg_day_score_7d: number | null;
   avg_day_score_30d: number | null;
   habits: HabitSummary[];
+  state: StateSummary;
 };
 
 export type DayScorePoint = {
   entry_date: string;
   day_score: number | null;
+  energy: number | null;
+  mood: number | null;
+  body_condition: number | null;
 };
 
 export type TagImpact = {

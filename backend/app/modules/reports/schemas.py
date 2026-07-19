@@ -6,6 +6,9 @@ from pydantic import BaseModel
 class DayScorePoint(BaseModel):
     entry_date: date
     day_score: float | None
+    energy: int | None = None
+    mood: int | None = None
+    body_condition: int | None = None
 
 
 class HabitTrendPoint(BaseModel):
@@ -27,10 +30,20 @@ class HabitSummary(BaseModel):
     current_streak_days: int
 
 
+class StateSummary(BaseModel):
+    avg_energy_7d: float | None
+    avg_energy_30d: float | None
+    avg_mood_7d: float | None
+    avg_mood_30d: float | None
+    avg_body_condition_7d: float | None
+    avg_body_condition_30d: float | None
+
+
 class ReportSummary(BaseModel):
     avg_day_score_7d: float | None
     avg_day_score_30d: float | None
     habits: list[HabitSummary]
+    state: StateSummary
 
 
 class SleepPoint(BaseModel):

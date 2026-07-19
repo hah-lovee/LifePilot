@@ -89,16 +89,20 @@ def upsert_entry(
     if entry is None:
         entry = DiaryEntry(user_id=user.id, entry_date=payload.entry_date)
         db.add(entry)
-    entry.content = payload.content
-    entry.tags = payload.tags
-    entry.sleep_bedtime = payload.sleep_bedtime
-    entry.sleep_wakeup = payload.sleep_wakeup
 
-    existing_tag_names = {t.name for t in db.query(DiaryTag).filter(DiaryTag.user_id == user.id)}
-    for name in payload.tags:
-        if name not in existing_tag_names:
-            db.add(DiaryTag(user_id=user.id, name=name))
-            existing_tag_names.add(name)
+    # Partial update: only fields the caller actually sent are touched, so the
+    # "Запись" tab (content/tags) and "Состояние" tab (energy/mood/body_condition/
+    # sleep) can save independently without clobbering each other's fields.
+    data = payload.model_dump(exclude_unset=True, exclude={"entry_date"})
+    for field, value in data.items():
+        setattr(entry, field, value)
+
+    if "tags" in data:
+        existing_tag_names = {t.name for t in db.query(DiaryTag).filter(DiaryTag.user_id == user.id)}
+        for name in data["tags"]:
+            if name not in existing_tag_names:
+                db.add(DiaryTag(user_id=user.id, name=name))
+                existing_tag_names.add(name)
 
     db.commit()
     db.refresh(entry)

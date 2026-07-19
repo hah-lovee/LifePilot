@@ -17,6 +17,7 @@ from app.modules.reports.schemas import (
     ReportSummary,
     SleepPoint,
     SleepSummary,
+    StateSummary,
     TagImpact,
 )
 
@@ -210,6 +211,27 @@ def summary(db: Session = Depends(get_db), user: User = Depends(get_current_user
         )
         return float(value) if value is not None else None
 
+    def avg_state_field_since(column, days: int) -> float | None:
+        value = (
+            db.query(func.avg(column))
+            .filter(
+                DiaryEntry.user_id == user.id,
+                DiaryEntry.entry_date >= today - timedelta(days=days),
+                column.isnot(None),
+            )
+            .scalar()
+        )
+        return float(value) if value is not None else None
+
+    state_summary = StateSummary(
+        avg_energy_7d=avg_state_field_since(DiaryEntry.energy, 7),
+        avg_energy_30d=avg_state_field_since(DiaryEntry.energy, 30),
+        avg_mood_7d=avg_state_field_since(DiaryEntry.mood, 7),
+        avg_mood_30d=avg_state_field_since(DiaryEntry.mood, 30),
+        avg_body_condition_7d=avg_state_field_since(DiaryEntry.body_condition, 7),
+        avg_body_condition_30d=avg_state_field_since(DiaryEntry.body_condition, 30),
+    )
+
     habits = db.query(Habit).filter(Habit.user_id == user.id, Habit.is_active.is_(True)).all()
     logs_by_habit: dict[int, list[HabitLog]] = defaultdict(list)
     if habits:
@@ -240,4 +262,5 @@ def summary(db: Session = Depends(get_db), user: User = Depends(get_current_user
         avg_day_score_7d=avg_day_score_since(7),
         avg_day_score_30d=avg_day_score_since(30),
         habits=habit_summaries,
+        state=state_summary,
     )

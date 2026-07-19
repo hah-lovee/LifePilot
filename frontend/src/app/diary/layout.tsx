@@ -7,6 +7,7 @@ import { RequireAuth } from "@/components/require-auth";
 
 const subLinks = [
   { href: "/diary", label: "Запись", datePerDay: true },
+  { href: "/diary/state", label: "Состояние", datePerDay: true },
   { href: "/diary/calendar", label: "Календарь", datePerDay: false },
   { href: "/diary/habits", label: "Привычки", datePerDay: true },
   { href: "/diary/tags", label: "Теги", datePerDay: false },

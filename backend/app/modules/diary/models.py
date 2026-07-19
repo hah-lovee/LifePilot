@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import ARRAY, Boolean, Date, DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import ARRAY, Boolean, Date, DateTime, ForeignKey, Numeric, SmallInteger, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -55,6 +55,10 @@ class DiaryEntry(Base):
     day_score: Mapped[float | None] = mapped_column(Numeric(4, 2), nullable=True)
     sleep_bedtime: Mapped[str | None] = mapped_column(String(5), nullable=True)  # "HH:MM" когда лёг
     sleep_wakeup: Mapped[str | None] = mapped_column(String(5), nullable=True)   # "HH:MM" когда встал
+    # Субъективное состояние за день, 1-10, вкладка "Состояние"
+    energy: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    mood: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    body_condition: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)  # самочувствие: болезнь/стресс сбивают
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

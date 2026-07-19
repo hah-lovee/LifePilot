@@ -19,35 +19,6 @@ export default function DiaryPage() {
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
-function prevDateStr(dateStr: string): string {
-  const d = new Date(dateStr);
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
-
-function calcSleepHours(bedtime: string, wakeup: string): number | null {
-  const [bh, bm] = bedtime.split(":").map(Number);
-  const [wh, wm] = wakeup.split(":").map(Number);
-  if ([bh, bm, wh, wm].some(isNaN)) return null;
-  const diff = ((wh * 60 + wm) - (bh * 60 + bm) + 24 * 60) % (24 * 60);
-  if (diff === 0 || diff > 20 * 60) return null;
-  return Math.round(diff / 6) / 10;
-}
-
-function SleepBadge({ hours }: { hours: number }) {
-  const [label, colors] =
-    hours >= 8 ? ["отличный", "bg-[#e6eee7] text-[#3f6b54]"] :
-    hours >= 7 ? ["хороший",  "bg-[#edf4f0] text-[#4d7a63]"] :
-    hours >= 6 ? ["нормальный","bg-[#f4eddc] text-[#8a6a1a]"] :
-                 ["плохой",   "bg-[#f4e2dd] text-[#b5503e]"];
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-[20px] font-semibold leading-none text-[var(--color-ink)]">{hours.toFixed(1)}ч</span>
-      <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${colors}`}>{label}</span>
-    </div>
-  );
-}
-
 function DiaryContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -63,9 +34,6 @@ function DiaryContent() {
   const [availableTags, setAvailableTags] = useState<DiaryTag[]>([]);
   const [newTagName, setNewTagName] = useState("");
   const [dayScore, setDayScore] = useState<number | null>(null);
-  const [sleepBedtime, setSleepBedtime] = useState("");
-  const [sleepWakeup, setSleepWakeup] = useState("");
-  const [prevBedtime, setPrevBedtime] = useState<string | null>(null); // «Лёг в» предыдущего дня
   const [error, setError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
 
@@ -81,33 +49,21 @@ function DiaryContent() {
     loadedRef.current = false;
     setSaveStatus("idle");
     setError(null);
-    setPrevBedtime(null);
     try {
-      const [entry, prevEntry] = await Promise.allSettled([
-        api.get<DiaryEntry>(`/api/diary/${targetDate}`),
-        api.get<DiaryEntry>(`/api/diary/${prevDateStr(targetDate)}`),
-      ]);
-      if (entry.status === "fulfilled") {
-        const e = entry.value;
-        setContent(e.content ?? "");
-        setSelectedTags(e.tags);
-        setDayScore(e.day_score);
-        setSleepBedtime(e.sleep_bedtime ?? "");
-        setSleepWakeup(e.sleep_wakeup ?? "");
-        lastSavedRef.current = stateKey(e.content ?? "", e.tags, e.sleep_bedtime ?? "", e.sleep_wakeup ?? "");
-      } else {
+      const entry = await api.get<DiaryEntry>(`/api/diary/${targetDate}`);
+      setContent(entry.content ?? "");
+      setSelectedTags(entry.tags);
+      setDayScore(entry.day_score);
+      lastSavedRef.current = stateKey(entry.content ?? "", entry.tags);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
         setContent("");
         setSelectedTags([]);
         setDayScore(null);
-        setSleepBedtime("");
-        setSleepWakeup("");
-        lastSavedRef.current = stateKey("", [], "", "");
+        lastSavedRef.current = stateKey("", []);
+      } else {
+        setError(err instanceof ApiError ? err.message : "Ошибка загрузки записи");
       }
-      if (prevEntry.status === "fulfilled") {
-        setPrevBedtime(prevEntry.value.sleep_bedtime ?? null);
-      }
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Ошибка загрузки записи");
     } finally {
       loadedRef.current = true;
     }
@@ -121,12 +77,12 @@ function DiaryContent() {
     loadEntry(date);
   }, [date]);
 
-  function stateKey(c: string, t: string[], bed: string, wake: string) {
-    return JSON.stringify({ c, t, bed, wake });
+  function stateKey(c: string, t: string[]) {
+    return JSON.stringify({ c, t });
   }
 
-  const doSave = useCallback(async (c: string, t: string[], bed: string, wake: string) => {
-    const key = stateKey(c, t, bed, wake);
+  const doSave = useCallback(async (c: string, t: string[]) => {
+    const key = stateKey(c, t);
     if (key === lastSavedRef.current) return;
     setSaveStatus("saving");
     try {
@@ -134,8 +90,6 @@ function DiaryContent() {
         entry_date: date,
         content: c,
         tags: t,
-        sleep_bedtime: bed || null,
-        sleep_wakeup: wake || null,
       });
       setDayScore(entry.day_score);
       lastSavedRef.current = key;
@@ -150,12 +104,12 @@ function DiaryContent() {
     if (!loadedRef.current) return;
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
-      doSave(content, selectedTags, sleepBedtime, sleepWakeup);
+      doSave(content, selectedTags);
     }, 1500);
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [content, selectedTags, sleepBedtime, sleepWakeup, doSave]);
+  }, [content, selectedTags, doSave]);
 
   function toggleTag(name: string) {
     setSelectedTags((prev) => (prev.includes(name) ? prev.filter((t) => t !== name) : [...prev, name]));
@@ -179,7 +133,7 @@ function DiaryContent() {
   async function onSave(e: FormEvent) {
     e.preventDefault();
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    await doSave(content, selectedTags, sleepBedtime, sleepWakeup);
+    await doSave(content, selectedTags);
   }
 
   return (
@@ -213,46 +167,6 @@ function DiaryContent() {
           placeholder="Что было сегодня важного?"
           rows={10}
         />
-
-        {/* Сон */}
-        <div className="card p-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-faint)]">Сон</p>
-          <div className="flex flex-wrap items-end gap-4">
-            <label className="flex flex-col gap-1">
-              <span className="text-[12px] text-[var(--color-muted)]">Встал в</span>
-              <input
-                type="time"
-                value={sleepWakeup}
-                onChange={(e) => setSleepWakeup(e.target.value)}
-                className="input-field w-[120px] rounded-lg py-1.5 text-[13px]"
-              />
-              <span className="text-[11px] text-[var(--color-faint)]">утро этого дня</span>
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-[12px] text-[var(--color-muted)]">Лёг в</span>
-              <input
-                type="time"
-                value={sleepBedtime}
-                onChange={(e) => setSleepBedtime(e.target.value)}
-                className="input-field w-[120px] rounded-lg py-1.5 text-[13px]"
-              />
-              <span className="text-[11px] text-[var(--color-faint)]">вечер этого дня</span>
-            </label>
-            {(() => {
-              const h = prevBedtime && sleepWakeup ? calcSleepHours(prevBedtime, sleepWakeup) : null;
-              return h !== null ? (
-                <div className="pb-4">
-                  <SleepBadge hours={h} />
-                </div>
-              ) : null;
-            })()}
-          </div>
-          {!prevBedtime && sleepWakeup && (
-            <p className="mt-2 text-[11px] text-[var(--color-faint)]">
-              Заполни «Лёг в» вчера, чтобы увидеть оценку сна
-            </p>
-          )}
-        </div>
 
         {/* Теги */}
         <div className="card p-4">
