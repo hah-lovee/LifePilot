@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { api, ApiError, getStaleData, setCachedData } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
+import { getSessionCache, setSessionCache, INVESTMENTS_CACHE_KEYS } from "@/lib/session-cache";
 import type { DividendEvent, MonthlyIncome } from "@/lib/types";
 
 function formatRub(value: number): string {
@@ -49,15 +50,16 @@ const MONTH_NAMES: Record<string, string> = {
 
 export default function InvestmentDividendsPage() {
   const [events, setEvents] = useState<DividendEvent[]>(
-    () => getStaleData<DividendEvent[]>("investments_dividends") ?? []
+    () => getSessionCache<DividendEvent[]>(INVESTMENTS_CACHE_KEYS.dividends) ?? []
   );
   const [monthly, setMonthly] = useState<MonthlyIncome[]>(
-    () => getStaleData<MonthlyIncome[]>("investments_monthly") ?? []
+    () => getSessionCache<MonthlyIncome[]>(INVESTMENTS_CACHE_KEYS.monthly) ?? []
   );
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => getSessionCache(INVESTMENTS_CACHE_KEYS.monthly) === undefined);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (getSessionCache(INVESTMENTS_CACHE_KEYS.monthly) !== undefined) return;
     Promise.all([
       api.get<DividendEvent[]>("/api/investments/dividends"),
       api.get<MonthlyIncome[]>("/api/investments/dividends/monthly"),
@@ -65,8 +67,8 @@ export default function InvestmentDividendsPage() {
       .then(([evs, mo]) => {
         setEvents(evs);
         setMonthly(mo);
-        setCachedData("investments_dividends", evs);
-        setCachedData("investments_monthly", mo);
+        setSessionCache(INVESTMENTS_CACHE_KEYS.dividends, evs);
+        setSessionCache(INVESTMENTS_CACHE_KEYS.monthly, mo);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки дивидендов"))
       .finally(() => setLoading(false));

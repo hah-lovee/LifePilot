@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { api, ApiError, getStaleData, setCachedData } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
+import { getSessionCache, setSessionCache, INVESTMENTS_CACHE_KEYS } from "@/lib/session-cache";
 import type { DiversificationBreakdown, DiversificationSlice, SectorDetail } from "@/lib/types";
 
 const COLORS = ["#2d4a5e", "#5e8aa8", "#9c7a33", "#3f6b54", "#b5503e", "#7a6ea3", "#a3a39c", "#cdd7dd"];
@@ -32,9 +33,11 @@ function DiversificationLoadingSkeleton() {
 export default function InvestmentDiversificationPage() {
   const router = useRouter();
   const [data, setData] = useState<DiversificationBreakdown | null>(
-    () => getStaleData<DiversificationBreakdown>("investments_diversification")
+    () => getSessionCache<DiversificationBreakdown>(INVESTMENTS_CACHE_KEYS.diversification) ?? null
   );
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(
+    () => getSessionCache(INVESTMENTS_CACHE_KEYS.diversification) === undefined
+  );
   const [error, setError] = useState<string | null>(null);
 
   // Drill-down по сектору
@@ -44,9 +47,10 @@ export default function InvestmentDiversificationPage() {
   const [sectorError, setSectorError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (getSessionCache(INVESTMENTS_CACHE_KEYS.diversification) !== undefined) return;
     api
       .get<DiversificationBreakdown>("/api/investments/diversification")
-      .then((d) => { setData(d); setCachedData("investments_diversification", d); })
+      .then((d) => { setData(d); setSessionCache(INVESTMENTS_CACHE_KEYS.diversification, d); })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки диверсификации"))
       .finally(() => setLoading(false));
   }, []);

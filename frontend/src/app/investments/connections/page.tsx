@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { api, ApiError } from "@/lib/api";
+import { clearSessionCache, ALL_INVESTMENTS_CACHE_KEYS } from "@/lib/session-cache";
 import type { InvestmentsSummary } from "@/lib/types";
 
 const EXCHANGES = ["okx", "binance", "bybit", "kucoin", "mexc"];
@@ -106,6 +107,7 @@ export default function InvestmentConnectionsPage() {
       setExchangePortfolioName("");
       const displayName = exchangePortfolioName.trim() || exchange;
       setMessage(`Биржа «${exchange}» (${displayName}) подключена`);
+      clearSessionCache(ALL_INVESTMENTS_CACHE_KEYS);
       await loadSummary();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось подключить биржу");
@@ -119,6 +121,7 @@ export default function InvestmentConnectionsPage() {
     try {
       await api.delete(`/api/investments/exchanges/${portfolioName}`);
       setMessage(`Портфель «${portfolioName}» отключён`);
+      clearSessionCache(ALL_INVESTMENTS_CACHE_KEYS);
       await loadSummary();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось отключить биржу");
@@ -141,6 +144,7 @@ export default function InvestmentConnectionsPage() {
       setBrokerPortfolioName("");
       const displayName = brokerPortfolioName.trim() || broker;
       setMessage(`Брокер «${broker}» (${displayName}) подключён`);
+      clearSessionCache(ALL_INVESTMENTS_CACHE_KEYS);
       await loadSummary();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось подключить брокера");
@@ -154,6 +158,7 @@ export default function InvestmentConnectionsPage() {
     try {
       await api.delete(`/api/investments/brokers/${portfolioName}`);
       setMessage(`Портфель «${portfolioName}» отключён`);
+      clearSessionCache(ALL_INVESTMENTS_CACHE_KEYS);
       await loadSummary();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось отключить брокера");

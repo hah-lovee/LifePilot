@@ -3,11 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { api, ApiError, getStaleData, setCachedData } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
+import { getSessionCache, setSessionCache, INVESTMENTS_CACHE_KEYS } from "@/lib/session-cache";
 import type { InvestmentsSummary, NetWorthPoint } from "@/lib/types";
-
-const SUMMARY_CACHE_KEY = "investments_summary_v2";
-const NET_WORTH_CACHE_KEY = "investments_net_worth_v1";
 
 function formatRub(value: number): string {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value);
@@ -69,16 +67,18 @@ const PERIODS = [
 export default function InvestmentsPage() {
   const router = useRouter();
   const [netWorth, setNetWorth] = useState<NetWorthPoint[]>(
-    () => getStaleData<NetWorthPoint[]>(NET_WORTH_CACHE_KEY) ?? []
+    () => getSessionCache<NetWorthPoint[]>(INVESTMENTS_CACHE_KEYS.netWorth) ?? []
   );
   const [summary, setSummary] = useState<InvestmentsSummary | null>(
-    () => getStaleData<InvestmentsSummary>(SUMMARY_CACHE_KEY)
+    () => getSessionCache<InvestmentsSummary>(INVESTMENTS_CACHE_KEYS.summary) ?? null
   );
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => getSessionCache(INVESTMENTS_CACHE_KEYS.summary) === undefined);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<(typeof PERIODS)[number]["label"]>("Всё");
 
   useEffect(() => {
+    // Уже загружали в этой сессии — не дёргаем API заново, показываем как есть.
+    if (getSessionCache(INVESTMENTS_CACHE_KEYS.summary) !== undefined) return;
     setLoading(true);
     Promise.all([
       api.get<NetWorthPoint[]>("/api/investments/net-worth"),
@@ -87,8 +87,8 @@ export default function InvestmentsPage() {
       .then(([nw, s]) => {
         setNetWorth(nw);
         setSummary(s);
-        setCachedData(SUMMARY_CACHE_KEY, s);
-        setCachedData(NET_WORTH_CACHE_KEY, nw);
+        setSessionCache(INVESTMENTS_CACHE_KEYS.summary, s);
+        setSessionCache(INVESTMENTS_CACHE_KEYS.netWorth, nw);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки портфеля"))
       .finally(() => setLoading(false));
@@ -181,11 +181,15 @@ export default function InvestmentsPage() {
             ))}
           </div>
         </div>
-        {loading && chartData.length === 0 ? (
+        {loading && chartData.length < 2 ? (
           <Skeleton className="h-64 w-full" />
         ) : chartData.length === 0 ? (
           <p className="text-[var(--color-faint)]">
             Данных пока нет — подключите биржу или брокера.
+          </p>
+        ) : chartData.length < 2 ? (
+          <p className="text-[var(--color-faint)]">
+            Пока только один снэпшот капитала — график появится, когда накопится история за несколько дней.
           </p>
         ) : (
           <div className="h-64">
