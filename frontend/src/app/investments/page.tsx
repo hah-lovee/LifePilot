@@ -7,6 +7,7 @@ import { api, ApiError, getStaleData, setCachedData } from "@/lib/api";
 import type { InvestmentsSummary, NetWorthPoint } from "@/lib/types";
 
 const SUMMARY_CACHE_KEY = "investments_summary_v2";
+const NET_WORTH_CACHE_KEY = "investments_net_worth_v1";
 
 function formatRub(value: number): string {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value);
@@ -67,7 +68,9 @@ const PERIODS = [
 
 export default function InvestmentsPage() {
   const router = useRouter();
-  const [netWorth, setNetWorth] = useState<NetWorthPoint[]>([]);
+  const [netWorth, setNetWorth] = useState<NetWorthPoint[]>(
+    () => getStaleData<NetWorthPoint[]>(NET_WORTH_CACHE_KEY) ?? []
+  );
   const [summary, setSummary] = useState<InvestmentsSummary | null>(
     () => getStaleData<InvestmentsSummary>(SUMMARY_CACHE_KEY)
   );
@@ -85,6 +88,7 @@ export default function InvestmentsPage() {
         setNetWorth(nw);
         setSummary(s);
         setCachedData(SUMMARY_CACHE_KEY, s);
+        setCachedData(NET_WORTH_CACHE_KEY, nw);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки портфеля"))
       .finally(() => setLoading(false));
@@ -177,7 +181,9 @@ export default function InvestmentsPage() {
             ))}
           </div>
         </div>
-        {chartData.length === 0 ? (
+        {loading && chartData.length === 0 ? (
+          <Skeleton className="h-64 w-full" />
+        ) : chartData.length === 0 ? (
           <p className="text-[var(--color-faint)]">
             Данных пока нет — подключите биржу или брокера.
           </p>
