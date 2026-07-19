@@ -23,5 +23,8 @@ class Settings(BaseSettings):
     investments_api_url: str = "http://localhost:8001"
     investments_api_key: str = ""
 
+    telegram_bot_token: str = ""
+    telegram_bot_username: str = ""  # без "@", для ссылки-приглашения t.me/<username>
+
 
 settings = Settings()

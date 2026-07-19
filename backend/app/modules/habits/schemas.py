@@ -18,6 +18,9 @@ class HabitUpdate(BaseModel):
     frequency: HabitFrequency | None = None
     schedule_detail: int | None = None
     is_active: bool | None = None
+    reminder_enabled: bool | None = None
+    reminder_time: str | None = None  # "HH:MM"
+    reminder_weekdays: list[int] | None = Field(None, description="0=Monday..6=Sunday")
 
 
 class HabitOut(BaseModel):
@@ -28,6 +31,9 @@ class HabitOut(BaseModel):
     schedule_detail: int | None
     is_active: bool
     is_base: bool
+    reminder_enabled: bool
+    reminder_time: str | None
+    reminder_weekdays: list[int]
     created_at: datetime
 
     model_config = {"from_attributes": True}

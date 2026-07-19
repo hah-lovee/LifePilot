@@ -8,6 +8,9 @@ export type Habit = {
   schedule_detail: number | null;
   is_active: boolean;
   is_base: boolean;
+  reminder_enabled: boolean;
+  reminder_time: string | null;
+  reminder_weekdays: number[];
   created_at: string;
 };
 
@@ -115,6 +118,16 @@ export type DiaryTag = {
   id: number;
   name: string;
   is_base: boolean;
+};
+
+export type TelegramLinkOut = {
+  linked: boolean;
+  link_code: string | null;
+  deep_link: string | null;
+};
+
+export type TelegramStatusOut = {
+  linked: boolean;
 };
 
 export type WalletBalance = {

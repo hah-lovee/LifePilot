@@ -1,7 +1,7 @@
 import enum
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import ARRAY, Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -32,6 +32,11 @@ class Habit(Base):
     schedule_detail: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_base: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    # Telegram reminder schedule: independent of `frequency` above — a fixed
+    # time + explicit set of weekdays (0=Monday..6=Sunday) to nudge on.
+    reminder_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    reminder_time: Mapped[str | None] = mapped_column(String(5), nullable=True)  # "HH:MM"
+    reminder_weekdays: Mapped[list[int]] = mapped_column(ARRAY(Integer), default=list, server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     owner: Mapped["User"] = relationship(back_populates="habits")  # noqa: F821

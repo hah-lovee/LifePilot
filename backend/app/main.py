@@ -11,16 +11,22 @@ from app.modules.auth.router import router as auth_router
 from app.modules.diary.router import router as diary_router
 from app.modules.habits.router import router as habits_router
 from app.modules.investments.router import router as investments_router
-from app.modules.investments.scheduler import start_scheduler, stop_scheduler
+from app.modules.investments.scheduler import start_scheduler as start_investments_scheduler
+from app.modules.investments.scheduler import stop_scheduler as stop_investments_scheduler
 from app.modules.reports.router import router as reports_router
 from app.modules.sport.router import router as sport_router
+from app.modules.telegram.router import router as telegram_router
+from app.modules.telegram.scheduler import start_scheduler as start_telegram_scheduler
+from app.modules.telegram.scheduler import stop_scheduler as stop_telegram_scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    start_scheduler()
+    start_investments_scheduler()
+    start_telegram_scheduler()
     yield
-    stop_scheduler()
+    stop_telegram_scheduler()
+    stop_investments_scheduler()
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
@@ -43,6 +49,7 @@ app.include_router(reports_router)
 app.include_router(sport_router)
 app.include_router(admin_router)
 app.include_router(investments_router)
+app.include_router(telegram_router)
 
 
 @app.get("/api/health")

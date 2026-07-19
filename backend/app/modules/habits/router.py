@@ -112,11 +112,16 @@ def upsert_log(
         .first()
     )
     if log is None:
-        log = HabitLog(habit_id=habit_id, log_date=payload.log_date, score=payload.score, note=payload.note)
+        log = HabitLog(habit_id=habit_id, log_date=payload.log_date, score=payload.score)
         db.add(log)
-    else:
-        log.score = payload.score
-        log.note = payload.note
+
+    # Partial update: a caller that only sends `score` (the quick-log buttons
+    # on the habits list) must not wipe out a `note` set elsewhere (the habit
+    # detail card), and vice versa.
+    data = payload.model_dump(exclude_unset=True, exclude={"log_date"})
+    for field, value in data.items():
+        setattr(log, field, value)
+
     db.commit()
     db.refresh(log)
 

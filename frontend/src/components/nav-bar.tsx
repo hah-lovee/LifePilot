@@ -9,6 +9,7 @@ const links = [
   { href: "/diary", label: "Дневник", datePerDay: true },
   { href: "/sport", label: "Спорт", datePerDay: true },
   { href: "/investments", label: "Инвестиции", datePerDay: false },
+  { href: "/settings", label: "Настройки", datePerDay: false },
 ];
 
 export function NavBar() {

@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { DateNav } from "@/components/date-nav";
@@ -95,6 +96,8 @@ function HabitsContent() {
   async function logScore(habitId: number, score: number) {
     setError(null);
     try {
+      // Не передаём note явно — бэкенд обновляет только присланные поля,
+      // так что уже сохранённый комментарий (карточка привычки) не затирается.
       const log = await api.put<HabitLog>(`/api/habits/${habitId}/logs`, { log_date: date, score });
       setDateLogs((prev) => ({ ...prev, [habitId]: log }));
     } catch (err) {
@@ -164,14 +167,30 @@ function HabitsContent() {
       <ul className="flex flex-col gap-2.5">
         {habits.map((habit) => {
           const loggedScore = dateLogs[habit.id]?.score ?? null;
+          const hasNote = !!dateLogs[habit.id]?.note;
           return (
             <li key={habit.id} className="card p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                  <span className="font-semibold text-[var(--color-ink)]">{habit.name}</span>
+                  <Link
+                    href={`/diary/habits/${habit.id}?date=${date}`}
+                    className="font-semibold text-[var(--color-ink)] hover:text-[var(--color-accent)] hover:underline"
+                  >
+                    {habit.name}
+                  </Link>
                   <span className="rounded-md bg-[#f2f2ee] px-2 py-0.5 text-[11.5px] text-[var(--color-muted)]">
                     {frequencyLabel[habit.frequency]}
                   </span>
+                  {hasNote && (
+                    <span className="text-[13px] text-[var(--color-faint)]" title="Есть комментарий">
+                      💬
+                    </span>
+                  )}
+                  {habit.reminder_enabled && (
+                    <span className="text-[13px] text-[var(--color-faint)]" title={`Напоминание в ${habit.reminder_time}`}>
+                      🔔
+                    </span>
+                  )}
                 </div>
                 <button onClick={() => setActive(habit.id, false)} className="btn-text">
                   Архивировать
