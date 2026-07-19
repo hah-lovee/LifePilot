@@ -11,6 +11,16 @@ export default function ReportsPage() {
   const [tagImpact, setTagImpact] = useState<TagImpact[]>([]);
   const [sleep, setSleep] = useState<SleepSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hiddenStateKeys, setHiddenStateKeys] = useState<Set<string>>(new Set());
+
+  function toggleStateKey(key: string) {
+    setHiddenStateKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   useEffect(() => {
     Promise.all([
@@ -113,9 +123,38 @@ export default function ReportsPage() {
                   <XAxis dataKey="date" fontSize={11} stroke="#9c9c95" tickLine={false} axisLine={{ stroke: "#f0f0ec" }} />
                   <YAxis domain={[0, 10]} fontSize={11} stroke="#9c9c95" tickLine={false} axisLine={false} width={24} />
                   <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid #e7e7e2", fontSize: 12 }} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Line type="monotone" dataKey="energy" name="Энергия" stroke="#2d4a5e" strokeWidth={2} dot={{ r: 2 }} connectNulls />
-                  <Line type="monotone" dataKey="mood" name="Настроение" stroke="#9c7a33" strokeWidth={2} dot={{ r: 2 }} connectNulls />
+                  <Legend
+                    wrapperStyle={{ fontSize: 11, cursor: "pointer" }}
+                    onClick={(entry: any) => toggleStateKey(String(entry.dataKey))}
+                    formatter={(value: string, entry: any) => {
+                      const hidden = hiddenStateKeys.has(String(entry.dataKey));
+                      return (
+                        <span style={{ opacity: hidden ? 0.4 : 1, textDecoration: hidden ? "line-through" : "none" }}>
+                          {value}
+                        </span>
+                      );
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="energy"
+                    name="Энергия"
+                    stroke="#2d4a5e"
+                    strokeWidth={2}
+                    dot={{ r: 2 }}
+                    connectNulls
+                    hide={hiddenStateKeys.has("energy")}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="mood"
+                    name="Настроение"
+                    stroke="#9c7a33"
+                    strokeWidth={2}
+                    dot={{ r: 2 }}
+                    connectNulls
+                    hide={hiddenStateKeys.has("mood")}
+                  />
                   <Line
                     type="monotone"
                     dataKey="body_condition"
@@ -124,6 +163,7 @@ export default function ReportsPage() {
                     strokeWidth={2}
                     dot={{ r: 2 }}
                     connectNulls
+                    hide={hiddenStateKeys.has("body_condition")}
                   />
                   <Line
                     type="monotone"
@@ -133,6 +173,7 @@ export default function ReportsPage() {
                     strokeWidth={2}
                     dot={{ r: 2 }}
                     connectNulls
+                    hide={hiddenStateKeys.has("sleep_score")}
                   />
                   <Line
                     type="monotone"
@@ -143,6 +184,7 @@ export default function ReportsPage() {
                     strokeDasharray="4 3"
                     dot={false}
                     connectNulls
+                    hide={hiddenStateKeys.has("average")}
                   />
                 </LineChart>
               </ResponsiveContainer>
