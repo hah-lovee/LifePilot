@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
+import { clearSessionCache, ALL_INVESTMENTS_CACHE_KEYS } from "@/lib/session-cache";
 import type { InvestmentsSummary, UnifiedCryptoTrade, WalletBalance } from "@/lib/types";
 
 function formatRub(value: number): string {
@@ -85,6 +86,7 @@ function CryptoAssetContent() {
       setPriceUsdt("");
       setFeeUsdt("");
       setNote("");
+      clearSessionCache(ALL_INVESTMENTS_CACHE_KEYS);
       await loadAll();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось сохранить сделку");
@@ -97,6 +99,7 @@ function CryptoAssetContent() {
     setError(null);
     try {
       await api.delete(`/api/investments/manual-trades/${id}`);
+      clearSessionCache(ALL_INVESTMENTS_CACHE_KEYS);
       await loadAll();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось удалить сделку");
