@@ -48,6 +48,7 @@ function SportContent() {
   const [logs, setLogs] = useState<ExerciseLog[]>([]);
   const [exerciseOrder, setExerciseOrder] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [previousBest, setPreviousBest] = useState<Map<number, ExerciseLog>>(new Map());
 
   async function loadExercises() {
     setExercises(await api.get<Exercise[]>("/api/exercises"));
@@ -57,12 +58,39 @@ function SportContent() {
     setLogs(await api.get<ExerciseLog[]>(`/api/exercise-logs?log_date=${date}`));
   }
 
+  // Лучший подход (макс. вес, при равенстве — больше повторов) с последнего
+  // дня ДО текущего, когда это упражнение выполнялось — чтобы вспомнить
+  // рабочий вес во время тренировки.
+  async function loadPreviousBest() {
+    const history = await api.get<ExerciseLog[]>(`/api/exercise-logs?date_to=${date}`);
+    const lastDateByExercise = new Map<number, string>();
+    for (const log of history) {
+      if (log.log_date >= date) continue;
+      const current = lastDateByExercise.get(log.exercise_id);
+      if (!current || log.log_date > current) lastDateByExercise.set(log.exercise_id, log.log_date);
+    }
+    const best = new Map<number, ExerciseLog>();
+    for (const log of history) {
+      if (lastDateByExercise.get(log.exercise_id) !== log.log_date) continue;
+      const current = best.get(log.exercise_id);
+      if (
+        !current ||
+        (log.weight ?? -1) > (current.weight ?? -1) ||
+        ((log.weight ?? -1) === (current.weight ?? -1) && (log.reps ?? 0) > (current.reps ?? 0))
+      ) {
+        best.set(log.exercise_id, log);
+      }
+    }
+    setPreviousBest(best);
+  }
+
   useEffect(() => {
     loadExercises().catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки упражнений"));
   }, []);
 
   useEffect(() => {
     loadLogs().catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки тренировки"));
+    loadPreviousBest().catch(() => {}); // необязательная подсказка — не блокируем тренировку при её сбое
   }, [date]);
 
   const exerciseById = new Map(exercises.map((ex) => [ex.id, ex]));
@@ -165,6 +193,7 @@ function SportContent() {
                   index={index + 1}
                   exercise={exerciseById.get(exerciseId)}
                   logs={exerciseLogs}
+                  previousBest={previousBest.get(exerciseId)}
                   onAddSet={() => addSet(exerciseId)}
                   onUpdateLog={updateLog}
                   onDeleteLog={deleteLog}
@@ -183,6 +212,7 @@ function SortableExerciseItem({
   index,
   exercise,
   logs,
+  previousBest,
   onAddSet,
   onUpdateLog,
   onDeleteLog,
@@ -191,6 +221,7 @@ function SortableExerciseItem({
   index: number;
   exercise: Exercise | undefined;
   logs: ExerciseLog[];
+  previousBest?: ExerciseLog;
   onAddSet: () => void;
   onUpdateLog: (logId: number, weight: number | null, reps: number | null) => void;
   onDeleteLog: (logId: number) => void;
@@ -211,6 +242,7 @@ function SortableExerciseItem({
         exercise={exercise}
         logs={logs}
         index={index}
+        previousBest={previousBest}
         dragHandleProps={{ ...attributes, ...listeners }}
         onAddSet={onAddSet}
         onUpdateLog={onUpdateLog}
@@ -224,6 +256,7 @@ function ExerciseGroup({
   exercise,
   logs,
   index,
+  previousBest,
   dragHandleProps,
   onAddSet,
   onUpdateLog,
@@ -232,6 +265,7 @@ function ExerciseGroup({
   exercise: Exercise | undefined;
   logs: ExerciseLog[];
   index: number;
+  previousBest?: ExerciseLog;
   dragHandleProps?: React.HTMLAttributes<HTMLElement>;
   onAddSet: () => void;
   onUpdateLog: (logId: number, weight: number | null, reps: number | null) => void;
@@ -264,6 +298,11 @@ function ExerciseGroup({
           <p className="font-semibold text-[var(--color-ink)]">{exercise?.name ?? "Упражнение удалено"}</p>
           {exercise?.muscle_group && (
             <p className="text-[11.5px] text-[var(--color-faint)]">{exercise.muscle_group}</p>
+          )}
+          {previousBest && (
+            <p className="text-[11.5px] text-[var(--color-muted)]">
+              Пред. ({previousBest.log_date.slice(5)}): {previousBest.weight ?? "—"} кг × {previousBest.reps ?? "—"}
+            </p>
           )}
         </div>
         <button onClick={onAddSet} className="btn-secondary whitespace-nowrap py-1.5 text-[12.5px]">
