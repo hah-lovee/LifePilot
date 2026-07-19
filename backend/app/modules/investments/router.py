@@ -251,6 +251,17 @@ def get_manual_trades(
     return list_manual_trades(db, user.id, portfolio_name, currency)
 
 
+def _resave_today_snapshot(db: Session, user_id: int) -> None:
+    """save_snapshot upserts by date, so re-running it after a manual-trade
+    edit overwrites today's row with the corrected invested_amount_rub —
+    otherwise a bad cost basis entered and later fixed the same day stays
+    frozen in investment_snapshots until the next day's snapshot job runs,
+    since _try_save_snapshot only saves once per day per _snapshot_saved_today."""
+    _snapshot_saved_today.pop(user_id, None)
+    _try_save_snapshot(db, user_id, _rates())
+    _snapshot_saved_today[user_id] = date.today().isoformat()
+
+
 @router.post("/manual-trades", response_model=ManualCryptoTradeOut, status_code=status.HTTP_201_CREATED)
 def create_manual_trade(
     payload: ManualCryptoTradeCreate,
@@ -262,6 +273,7 @@ def create_manual_trade(
     db.commit()
     db.refresh(trade)
     _invalidate_user_cache(user.id)
+    _resave_today_snapshot(db, user.id)
     return trade
 
 
@@ -272,3 +284,4 @@ def remove_manual_trade(
     if not delete_manual_trade(db, user.id, trade_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена")
     _invalidate_user_cache(user.id)
+    _resave_today_snapshot(db, user.id)
