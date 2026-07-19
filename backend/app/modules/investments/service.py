@@ -1,8 +1,10 @@
 from collections import defaultdict
-from datetime import date, datetime
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from app.modules.investments import client
 from app.modules.investments.models import InvestmentSnapshot, ManualCryptoTrade
 from app.modules.investments.schemas import (
     AssetDetail,
@@ -62,29 +64,75 @@ def compute_invested_amount(balances: dict, usd_rub: float) -> float:
     return round(total, 2)
 
 
-# ── Ручная себестоимость крипты ─────────────────────────────
-# Для позиций, которые автосинхронизация не смогла оценить (переименованный/
-# делистнутый тикер на бирже, монеты, переведённые извне и т.п.) — пользователь
-# сам вносит свои покупки/продажи, и мы считаем средневзвешенную цену тем же
-# FIFO-методом, что и trading-keys-api для реальных сделок с биржи.
+# ── Себестоимость крипты: авто (биржа) + ручной ввод, единой лентой ────
+# trading-keys-api считает average_price по РЕАЛЬНЫМ сделкам с биржи, но
+# только под ТЕКУЩИМ тикером (см. GET /trades/{guid}/{portfolio}/{currency}).
+# Если тикер переименовали/делистнули или монету перевели с другой биржи,
+# части истории там взяться неоткуда — пользователь дополняет её вручную
+# (ManualCryptoTrade). Ниже обе стороны приводятся к одному виду и считаются
+# одним FIFO-проходом, отсортированным по дате, а не "либо то, либо это".
 
-def _fifo_average_price(trades: list[ManualCryptoTrade]) -> float | None:
+@dataclass
+class _UnifiedTrade:
+    trade_date: date
+    side: str
+    quantity: float
+    price_usdt: float
+    fee_usdt: float
+    source: str  # "auto" | "manual"
+    note: str | None = None
+    manual_id: int | None = None
+
+
+def _manual_to_unified(t: ManualCryptoTrade) -> _UnifiedTrade:
+    return _UnifiedTrade(
+        trade_date=t.trade_date,
+        side=t.side,
+        quantity=float(t.quantity),
+        price_usdt=float(t.price_usdt),
+        fee_usdt=float(t.fee_usdt or 0),
+        source="manual",
+        note=t.note,
+        manual_id=t.id,
+    )
+
+
+def _auto_to_unified(raw: dict) -> _UnifiedTrade:
+    ts = raw.get("timestamp") or 0
+    trade_date = datetime.fromtimestamp(ts / 1000, tz=timezone.utc).date() if ts else date.today()
+    return _UnifiedTrade(
+        trade_date=trade_date,
+        side=raw.get("side", ""),
+        quantity=float(raw.get("amount") or 0),
+        price_usdt=float(raw.get("price") or 0),
+        fee_usdt=0.0,  # trading-keys-api's own trade history endpoint doesn't expose fee either
+        source="auto",
+    )
+
+
+def _fifo_average_price(trades: list[_UnifiedTrade]) -> float | None:
     position = 0.0
     total_cost = 0.0
     for t in sorted(trades, key=lambda t: t.trade_date):
-        qty = float(t.quantity)
-        price = float(t.price_usdt)
-        fee = float(t.fee_usdt or 0)
         if t.side == "buy":
-            total_cost += qty * price + fee
-            position += qty
+            total_cost += t.quantity * t.price_usdt + t.fee_usdt
+            position += t.quantity
         elif t.side == "sell" and position > 0:
-            sell_ratio = min(qty / position, 1.0)
+            sell_ratio = min(t.quantity / position, 1.0)
             total_cost = max(0.0, total_cost * (1.0 - sell_ratio))
-            position = max(0.0, position - qty)
+            position = max(0.0, position - t.quantity)
     if position <= 0:
         return None
     return total_cost / position
+
+
+def get_unified_trade_history(
+    db: Session, user_id: int, portfolio_name: str, currency: str
+) -> list[_UnifiedTrade]:
+    manual = list_manual_trades(db, user_id, portfolio_name, currency)
+    auto_raw = client.get_synced_trades(str(user_id), portfolio_name, currency)
+    combined = [_auto_to_unified(r) for r in auto_raw] + [_manual_to_unified(t) for t in manual]
+    return sorted(combined, key=lambda t: t.trade_date)
 
 
 def list_manual_trades(
@@ -116,31 +164,34 @@ def delete_manual_trade(db: Session, user_id: int, trade_id: int) -> bool:
 
 
 def apply_manual_cost_basis(db: Session, user_id: int, balances: dict) -> dict:
-    """Overlays user-entered cost basis onto the raw trading-keys-api balances
-    dict, in place: wherever a manual entry exists for (portfolio, currency),
-    it takes priority over whatever (or nothing) the automatic sync found,
-    and pnl_usdt/pnl_percent are recomputed from it so every downstream view
-    (summary table, diversification, sector drill-down) stays consistent."""
-    overrides = (
+    """Overlays cost basis onto the raw trading-keys-api balances dict, in
+    place, for every (portfolio, currency) that has at least one manual
+    entry: combines it with that position's real synced trades (if any) into
+    one FIFO pass, and recomputes pnl_usdt/pnl_percent from the result so
+    every downstream view (summary table, diversification, sector drill-down)
+    stays consistent. Positions with no manual entries are left untouched —
+    trading-keys-api's own average_price/pnl already cover the normal case."""
+    manual_overrides = (
         db.query(ManualCryptoTrade)
         .filter(ManualCryptoTrade.user_id == user_id)
         .all()
     )
-    if not overrides:
+    if not manual_overrides:
         return balances
 
-    by_key: dict[tuple[str, str], list[ManualCryptoTrade]] = defaultdict(list)
-    for t in overrides:
-        by_key[(t.portfolio_name, t.currency)].append(t)
+    portfolios_with_overrides: set[tuple[str, str]] = {
+        (t.portfolio_name, t.currency) for t in manual_overrides
+    }
 
     for exchange in balances.get("crypto", []):
         if exchange.get("status") != "ok":
             continue
         key_prefix = exchange.get("portfolio_name") or exchange.get("exchange")
         for wallet in exchange.get("balances", []):
-            trades = by_key.get((key_prefix, wallet.get("currency")))
-            if not trades:
+            currency = wallet.get("currency")
+            if (key_prefix, currency) not in portfolios_with_overrides:
                 continue
+            trades = get_unified_trade_history(db, user_id, key_prefix, currency)
             avg_price = _fifo_average_price(trades)
             if avg_price is None:
                 continue

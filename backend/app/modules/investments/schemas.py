@@ -158,6 +158,19 @@ class ManualCryptoTradeOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UnifiedCryptoTrade(BaseModel):
+    source: str  # "auto" | "manual"
+    manual_id: int | None = None  # set only for source="manual" — used by the delete button
+    trade_date: date
+    side: str
+    quantity: float
+    price_usdt: float
+    fee_usdt: float
+    note: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
 # ── Профиль отдельного актива ────────────────────────────────
 
 class AssetDetail(BaseModel):

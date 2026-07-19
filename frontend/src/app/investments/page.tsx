@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api, ApiError } from "@/lib/api";
 import { getSessionCache, setSessionCache, INVESTMENTS_CACHE_KEYS } from "@/lib/session-cache";
-import { ManualCostBasisModal } from "@/components/manual-cost-basis-modal";
 import type { InvestmentsSummary, NetWorthPoint } from "@/lib/types";
 
 function formatRub(value: number): string {
@@ -85,7 +84,6 @@ export default function InvestmentsPage() {
   const [loading, setLoading] = useState(() => getSessionCache(INVESTMENTS_CACHE_KEYS.summary) === undefined);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<(typeof PERIODS)[number]["label"]>("Всё");
-  const [costBasisTarget, setCostBasisTarget] = useState<{ portfolioName: string; currency: string } | null>(null);
 
   function loadPortfolio() {
     setLoading(true);
@@ -277,34 +275,28 @@ export default function InvestmentsPage() {
                   </thead>
                   <tbody>
                     {exchange.balances.map((w) => (
-                      <tr key={w.currency} className="border-b border-[#f5f5f1]">
+                      <tr
+                        key={w.currency}
+                        onClick={() =>
+                          router.push(
+                            `/investments/assets/crypto/${encodeURIComponent(w.currency)}?portfolio=${encodeURIComponent(
+                              exchange.portfolio_name || exchange.exchange
+                            )}`
+                          )
+                        }
+                        className="cursor-pointer border-b border-[#f5f5f1] hover:bg-[#fafaf8] transition-colors"
+                      >
                         <td className="py-2.5 font-medium">{w.currency}</td>
                         <td className="py-2.5 text-right font-mono">{w.total}</td>
                         <td className="py-2.5 text-right font-mono font-semibold">
                           {w.value_usdt?.toFixed(2) ?? "—"}
                         </td>
-                        <td className="py-2.5 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <span
-                              className={`font-mono text-[13px] ${
-                                w.pnl_usdt !== null && w.pnl_usdt < 0 ? "text-[#b5503e]" : "text-[#3f6b54]"
-                              }`}
-                            >
-                              {w.pnl_usdt !== null ? `${w.pnl_usdt >= 0 ? "+" : ""}${w.pnl_usdt.toFixed(2)}` : "—"}
-                            </span>
-                            <button
-                              onClick={() =>
-                                setCostBasisTarget({
-                                  portfolioName: exchange.portfolio_name || exchange.exchange,
-                                  currency: w.currency,
-                                })
-                              }
-                              title="Указать себестоимость вручную"
-                              className="text-[12px] text-[var(--color-faint)] hover:text-[var(--color-accent)]"
-                            >
-                              ✎
-                            </button>
-                          </div>
+                        <td
+                          className={`py-2.5 text-right font-mono text-[13px] ${
+                            w.pnl_usdt !== null && w.pnl_usdt < 0 ? "text-[#b5503e]" : "text-[#3f6b54]"
+                          }`}
+                        >
+                          {w.pnl_usdt !== null ? `${w.pnl_usdt >= 0 ? "+" : ""}${w.pnl_usdt.toFixed(2)}` : "—"}
                         </td>
                       </tr>
                     ))}
@@ -391,15 +383,6 @@ export default function InvestmentsPage() {
           </section>
         );
       })}
-
-      {costBasisTarget && (
-        <ManualCostBasisModal
-          portfolioName={costBasisTarget.portfolioName}
-          currency={costBasisTarget.currency}
-          onClose={() => setCostBasisTarget(null)}
-          onSaved={loadPortfolio}
-        />
-      )}
     </div>
   );
 }

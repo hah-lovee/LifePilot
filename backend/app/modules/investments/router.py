@@ -19,6 +19,7 @@ from app.modules.investments.schemas import (
     MonthlyIncome,
     NetWorthPoint,
     SectorDetail,
+    UnifiedCryptoTrade,
 )
 from app.modules.investments import cache as inv_cache
 from app.modules.investments.models import ManualCryptoTrade
@@ -30,6 +31,7 @@ from app.modules.investments.service import (
     delete_manual_trade,
     get_net_worth_history,
     get_sector_detail,
+    get_unified_trade_history,
     list_manual_trades,
     save_snapshot,
 )
@@ -226,6 +228,18 @@ def get_asset(
 
 
 # ── Ручная себестоимость крипты ─────────────────────────────
+
+@router.get("/crypto-trades", response_model=list[UnifiedCryptoTrade])
+def get_crypto_trade_history(
+    portfolio_name: str,
+    currency: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list:
+    """Единая, отсортированная по дате лента: реальные сделки с биржи
+    (trading-keys-api) + ручные записи пользователя — для карточки токена."""
+    return get_unified_trade_history(db, user.id, portfolio_name, currency)
+
 
 @router.get("/manual-trades", response_model=list[ManualCryptoTradeOut])
 def get_manual_trades(

@@ -144,6 +144,17 @@ export type ManualCryptoTrade = {
   created_at: string;
 };
 
+export type UnifiedCryptoTrade = {
+  source: "auto" | "manual";
+  manual_id: number | null;
+  trade_date: string;
+  side: "buy" | "sell";
+  quantity: number;
+  price_usdt: number;
+  fee_usdt: number;
+  note: string | null;
+};
+
 export type WalletBalance = {
   currency: string;
   total: number;

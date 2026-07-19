@@ -137,3 +137,17 @@ def sync_trades(user_guid: str) -> dict:
         return {"synced": 0, "errors": [resp.text]}
     except Exception:
         return {"synced": 0, "errors": ["sync request failed"]}
+
+
+def get_synced_trades(user_guid: str, portfolio_name: str, currency: str) -> list[dict]:
+    """Реальные сделки с биржи, уже сохранённые trading-keys-api (без live-запроса
+    к бирже) — используется, чтобы объединить их с ручными записями в единую
+    историю по токену. Не бросает исключение при ошибке — история сделок не
+    критична для остального функционала страницы."""
+    try:
+        resp = _request("get", f"/trades/{user_guid}/{portfolio_name}/{currency}", timeout=15)
+        if resp.ok:
+            return resp.json()
+        return []
+    except Exception:
+        return []
