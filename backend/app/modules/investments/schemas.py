@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -128,6 +128,34 @@ class SectorDetail(BaseModel):
     value_rub: float
     pct: float
     positions: list[BrokerPosition]
+
+
+# ── Ручной ввод себестоимости (когда автосинхронизация не смогла) ──
+
+class ManualCryptoTradeCreate(BaseModel):
+    portfolio_name: str
+    currency: str
+    trade_date: date
+    side: str = Field(..., pattern="^(buy|sell)$")
+    quantity: float = Field(..., gt=0)
+    price_usdt: float = Field(..., gt=0)
+    fee_usdt: float | None = Field(None, ge=0)
+    note: str | None = None
+
+
+class ManualCryptoTradeOut(BaseModel):
+    id: int
+    portfolio_name: str
+    currency: str
+    trade_date: date
+    side: str
+    quantity: float
+    price_usdt: float
+    fee_usdt: float | None
+    note: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 # ── Профиль отдельного актива ────────────────────────────────

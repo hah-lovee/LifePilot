@@ -131,6 +131,19 @@ export type TelegramStatusOut = {
   linked: boolean;
 };
 
+export type ManualCryptoTrade = {
+  id: number;
+  portfolio_name: string;
+  currency: string;
+  trade_date: string;
+  side: "buy" | "sell";
+  quantity: number;
+  price_usdt: number;
+  fee_usdt: number | null;
+  note: string | null;
+  created_at: string;
+};
+
 export type WalletBalance = {
   currency: string;
   total: number;

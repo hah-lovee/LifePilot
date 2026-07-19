@@ -3,7 +3,7 @@ from datetime import date, datetime
 
 from sqlalchemy.orm import Session
 
-from app.modules.investments.models import InvestmentSnapshot
+from app.modules.investments.models import InvestmentSnapshot, ManualCryptoTrade
 from app.modules.investments.schemas import (
     AssetDetail,
     DiversificationBreakdown,
@@ -60,6 +60,98 @@ def compute_invested_amount(balances: dict, usd_rub: float) -> float:
             total += (pos.get("average_price") or 0) * (pos.get("quantity") or 0)
 
     return round(total, 2)
+
+
+# ── Ручная себестоимость крипты ─────────────────────────────
+# Для позиций, которые автосинхронизация не смогла оценить (переименованный/
+# делистнутый тикер на бирже, монеты, переведённые извне и т.п.) — пользователь
+# сам вносит свои покупки/продажи, и мы считаем средневзвешенную цену тем же
+# FIFO-методом, что и trading-keys-api для реальных сделок с биржи.
+
+def _fifo_average_price(trades: list[ManualCryptoTrade]) -> float | None:
+    position = 0.0
+    total_cost = 0.0
+    for t in sorted(trades, key=lambda t: t.trade_date):
+        qty = float(t.quantity)
+        price = float(t.price_usdt)
+        fee = float(t.fee_usdt or 0)
+        if t.side == "buy":
+            total_cost += qty * price + fee
+            position += qty
+        elif t.side == "sell" and position > 0:
+            sell_ratio = min(qty / position, 1.0)
+            total_cost = max(0.0, total_cost * (1.0 - sell_ratio))
+            position = max(0.0, position - qty)
+    if position <= 0:
+        return None
+    return total_cost / position
+
+
+def list_manual_trades(
+    db: Session, user_id: int, portfolio_name: str, currency: str
+) -> list[ManualCryptoTrade]:
+    return (
+        db.query(ManualCryptoTrade)
+        .filter(
+            ManualCryptoTrade.user_id == user_id,
+            ManualCryptoTrade.portfolio_name == portfolio_name,
+            ManualCryptoTrade.currency == currency,
+        )
+        .order_by(ManualCryptoTrade.trade_date)
+        .all()
+    )
+
+
+def delete_manual_trade(db: Session, user_id: int, trade_id: int) -> bool:
+    trade = (
+        db.query(ManualCryptoTrade)
+        .filter(ManualCryptoTrade.id == trade_id, ManualCryptoTrade.user_id == user_id)
+        .first()
+    )
+    if trade is None:
+        return False
+    db.delete(trade)
+    db.commit()
+    return True
+
+
+def apply_manual_cost_basis(db: Session, user_id: int, balances: dict) -> dict:
+    """Overlays user-entered cost basis onto the raw trading-keys-api balances
+    dict, in place: wherever a manual entry exists for (portfolio, currency),
+    it takes priority over whatever (or nothing) the automatic sync found,
+    and pnl_usdt/pnl_percent are recomputed from it so every downstream view
+    (summary table, diversification, sector drill-down) stays consistent."""
+    overrides = (
+        db.query(ManualCryptoTrade)
+        .filter(ManualCryptoTrade.user_id == user_id)
+        .all()
+    )
+    if not overrides:
+        return balances
+
+    by_key: dict[tuple[str, str], list[ManualCryptoTrade]] = defaultdict(list)
+    for t in overrides:
+        by_key[(t.portfolio_name, t.currency)].append(t)
+
+    for exchange in balances.get("crypto", []):
+        if exchange.get("status") != "ok":
+            continue
+        key_prefix = exchange.get("portfolio_name") or exchange.get("exchange")
+        for wallet in exchange.get("balances", []):
+            trades = by_key.get((key_prefix, wallet.get("currency")))
+            if not trades:
+                continue
+            avg_price = _fifo_average_price(trades)
+            if avg_price is None:
+                continue
+            wallet["average_price"] = round(avg_price, 8)
+            total = wallet.get("total") or 0
+            value_usdt = wallet.get("value_usdt")
+            current_price = (value_usdt / total) if value_usdt is not None and total else None
+            if current_price is not None:
+                wallet["pnl_usdt"] = round((current_price - avg_price) * total, 4)
+                wallet["pnl_percent"] = round((current_price - avg_price) / avg_price * 100, 2) if avg_price else None
+    return balances
 
 
 def compute_dividends_received(dividends: list[dict]) -> float:
