@@ -50,9 +50,18 @@ function computeXIRR(history: NetWorthPoint[]): number | null {
   if (cashflows.length < 1) return null;
   const last = history[history.length - 1];
   cashflows.push({ date: new Date(last.snapshot_date), amount: last.total_value_rub });
+
+  // Аннуализация периода короче месяца растягивает даже скромный реальный
+  // прирост на целый год математически — получаются бессмысленные тысячи
+  // процентов. Не показываем XIRR, пока не накопится хотя бы ~месяц истории
+  // вложений (от первого движения денег до последнего снэпшота).
+  const spanDays = (cashflows[cashflows.length - 1].date.getTime() - cashflows[0].date.getTime()) / 86400000;
+  if (spanDays < 30) return null;
+
   const result = calcXIRR(cashflows);
-  // Нет смысла показывать XIRR если данных мало (1-2 снэпшота) или все вложения в одной точке
-  if (result === null || Math.abs(result) > 9999) return null;
+  // Подстраховка на случай, если даже при достаточном сроке расчёт даёт
+  // экстремальное значение (например, из-за очень резкого разового движения).
+  if (result === null || Math.abs(result) > 1000) return null;
   return result;
 }
 
@@ -435,7 +444,10 @@ function StatPnl({ label, valuRub, valuePct }: { label: string; valuRub: number 
 function StatXirr({ xirr }: { xirr: number | null }) {
   const positive = xirr === null || xirr >= 0;
   return (
-    <div className="metric-card">
+    <div
+      className="metric-card"
+      title={xirr === null ? "Появится, когда накопится история вложений хотя бы за месяц" : undefined}
+    >
       <p className="text-[12.5px] text-[var(--color-muted)]">XIRR (годовых)</p>
       <div className="mt-1.5 flex items-baseline gap-1">
         <span
