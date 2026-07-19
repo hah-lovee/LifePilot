@@ -13,8 +13,13 @@ class UserOut(BaseModel):
     email: EmailStr
     name: str
     is_admin: bool
+    timezone: str
 
     model_config = {"from_attributes": True}
+
+
+class UserUpdate(BaseModel):
+    timezone: str | None = None
 
 
 class Token(BaseModel):

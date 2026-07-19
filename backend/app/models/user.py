@@ -24,6 +24,10 @@ class User(Base):
     telegram_chat_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     telegram_link_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
+    # IANA tz name (e.g. "Europe/Moscow") — habit reminders are matched against
+    # this, not server local time, since the server runs in UTC.
+    timezone: Mapped[str] = mapped_column(String(64), default="Europe/Moscow", server_default="Europe/Moscow")
+
     habits: Mapped[list["Habit"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
     diary_entries: Mapped[list["DiaryEntry"]] = relationship(
         back_populates="owner", cascade="all, delete-orphan"

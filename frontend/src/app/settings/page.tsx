@@ -2,13 +2,36 @@
 
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
-import type { TelegramLinkOut, TelegramStatusOut } from "@/lib/types";
+import { useAuth } from "@/lib/auth-context";
+import type { TelegramLinkOut, TelegramStatusOut, User } from "@/lib/types";
+
+// Россия целиком укладывается в эти зоны (плюс UTC на всякий случай) —
+// напоминания сверяются с этим временем, а не с UTC сервера.
+const TIMEZONES = [
+  { value: "Europe/Kaliningrad", label: "Калининград (UTC+2)" },
+  { value: "Europe/Moscow", label: "Москва (UTC+3)" },
+  { value: "Europe/Samara", label: "Самара (UTC+4)" },
+  { value: "Asia/Yekaterinburg", label: "Екатеринбург (UTC+5)" },
+  { value: "Asia/Omsk", label: "Омск (UTC+6)" },
+  { value: "Asia/Novosibirsk", label: "Новосибирск (UTC+7)" },
+  { value: "Asia/Krasnoyarsk", label: "Красноярск (UTC+7)" },
+  { value: "Asia/Irkutsk", label: "Иркутск (UTC+8)" },
+  { value: "Asia/Yakutsk", label: "Якутск (UTC+9)" },
+  { value: "Asia/Vladivostok", label: "Владивосток (UTC+10)" },
+  { value: "Asia/Magadan", label: "Магадан (UTC+11)" },
+  { value: "Asia/Kamchatka", label: "Камчатка (UTC+12)" },
+  { value: "UTC", label: "UTC" },
+];
 
 export default function SettingsPage() {
+  const { user } = useAuth();
   const [linked, setLinked] = useState<boolean | null>(null);
   const [linkInfo, setLinkInfo] = useState<TelegramLinkOut | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const [tz, setTz] = useState("Europe/Moscow");
+  const [tzSaveStatus, setTzSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   async function loadStatus() {
     const status = await api.get<TelegramStatusOut>("/api/telegram/status");
@@ -19,6 +42,21 @@ export default function SettingsPage() {
   useEffect(() => {
     loadStatus().catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки статуса"));
   }, []);
+
+  useEffect(() => {
+    if (user) setTz(user.timezone);
+  }, [user]);
+
+  async function saveTimezone(newTz: string) {
+    setTz(newTz);
+    setTzSaveStatus("saving");
+    try {
+      await api.patch<User>("/api/auth/me", { timezone: newTz });
+      setTzSaveStatus("saved");
+    } catch {
+      setTzSaveStatus("error");
+    }
+  }
 
   // Пока показан код привязки — тихо проверяем каждые 3с, привязался ли чат,
   // чтобы не заставлять пользователя обновлять страницу руками.
@@ -63,6 +101,32 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-2xl">
       <h1 className="mb-5 text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Настройки</h1>
       {error && <p className="mb-4 text-sm text-[#b5503e]">{error}</p>}
+
+      <section className="card mb-4 p-4">
+        <h2 className="mb-1 text-sm font-semibold text-[var(--color-ink)]">Часовой пояс</h2>
+        <p className="mb-3.5 text-[13px] leading-relaxed text-[var(--color-muted)]">
+          Сервер работает по UTC — чтобы время напоминаний по привычкам («в 21:00») совпадало с твоим реальным
+          временем, укажи здесь свой часовой пояс.
+        </p>
+        <div className="flex items-center gap-3">
+          <select
+            value={tz}
+            onChange={(e) => saveTimezone(e.target.value)}
+            className="input-field w-auto"
+          >
+            {TIMEZONES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+          <span className="text-[12px] text-[var(--color-faint)]">
+            {tzSaveStatus === "saving" && "Сохраняется..."}
+            {tzSaveStatus === "saved" && "✓ Сохранено"}
+            {tzSaveStatus === "error" && "Ошибка сохранения"}
+          </span>
+        </div>
+      </section>
 
       <section className="card p-4">
         <h2 className="mb-1 text-sm font-semibold text-[var(--color-ink)]">Telegram-уведомления</h2>

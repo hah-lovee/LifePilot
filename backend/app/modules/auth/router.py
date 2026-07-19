@@ -1,3 +1,5 @@
+from zoneinfo import available_timezones
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -9,7 +11,7 @@ from app.core.deps import get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
 from app.modules.admin.service import REGISTRATION_CODE_KEY, get_setting
-from app.modules.auth.schemas import Token, UserCreate, UserOut
+from app.modules.auth.schemas import Token, UserCreate, UserOut, UserUpdate
 from app.modules.diary.models import BASE_DIARY_TAGS, DiaryTag
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -55,4 +57,17 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)) -> User:
+    return user
+
+
+@router.patch("/me", response_model=UserOut)
+def update_me(
+    payload: UserUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+) -> User:
+    if payload.timezone is not None:
+        if payload.timezone not in available_timezones():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown timezone")
+        user.timezone = payload.timezone
+    db.commit()
+    db.refresh(user)
     return user
