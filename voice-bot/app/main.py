@@ -7,11 +7,13 @@ silently steal each other's updates.
 """
 import asyncio
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.exceptions import TelegramNetworkError
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import Message
 
@@ -27,6 +29,13 @@ logger = logging.getLogger("voice-bot")
 # backlog is worse than useless: resolve_entry_date() stamps reports with
 # *now*, so a two-day-old voice note would be filed under the wrong day.
 MAX_MESSAGE_AGE = timedelta(hours=1)
+
+# Reconnect backoff after a Telegram network failure. Capped at 5 minutes so an
+# outage that ends overnight is picked up promptly; reset once polling has run
+# long enough to count as genuinely working.
+_MIN_BACKOFF = 5
+_MAX_BACKOFF = 300
+_STABLE_RUN = 120
 
 HELP_TEXT = (
     "Наговори или напиши отчёт о дне — разберу и запишу в дневник Life Pilot.\n\n"
@@ -151,10 +160,29 @@ async def main() -> None:
     )
 
     bot = Bot(token=config.TELEGRAM_BOT_TOKEN, session=AiohttpSession(timeout=config.TELEGRAM_TIMEOUT))
+    backoff = _MIN_BACKOFF
     try:
-        # Long polling rather than a webhook: the VM has no inbound route from
-        # the internet, and Telegram is reachable outbound only.
-        await dp.start_polling(bot, polling_timeout=30)
+        while True:
+            started = time.monotonic()
+            try:
+                # Long polling rather than a webhook: the VM has no inbound
+                # route from the internet, and Telegram is reachable outbound
+                # only.
+                await dp.start_polling(bot, polling_timeout=30)
+                return  # clean shutdown (signal)
+            except TelegramNetworkError as exc:
+                # Retry in-process instead of letting the container die: on
+                # this network Telegram outages are routine, and crash-looping
+                # under restart:unless-stopped just burns the connect timeout
+                # over and over while losing the resolved address each time.
+                if time.monotonic() - started > _STABLE_RUN:
+                    backoff = _MIN_BACKOFF  # it was working; treat this as fresh
+                logger.warning("Telegram unreachable (%s). Reconnecting in %ds", exc, backoff)
+                # The address that was working may have been filtered since —
+                # force a re-probe rather than retrying the same dead IP.
+                telegram_net.invalidate()
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, _MAX_BACKOFF)
     finally:
         await bot.session.close()
 

@@ -26,13 +26,19 @@ TELEGRAM_BOT_TOKEN = _require("TELEGRAM_BOT_TOKEN")
 # the chat id we hand to Life Pilot.
 ALLOWED_TELEGRAM_ID = _require("ALLOWED_TELEGRAM_ID")
 
-# api.telegram.org round-robins across ranges this ISP filters almost entirely;
-# the backend diagnosed 149.154.167.220 as one of the few reachable addresses
-# (see backend/app/modules/telegram/client.py for the full write-up). Pinning
-# only changes the connect() target — Host header and TLS SNI still say
-# api.telegram.org, so certificate validation is untouched.
+# api.telegram.org round-robins across ranges this ISP filters almost entirely,
+# and which addresses answer changes over time. app/telegram_net.py probes DNS
+# results plus these fallbacks and uses the first that accepts a connection, so
+# this list is a safety net for when DNS itself is unavailable rather than a
+# pin. Ordered with addresses confirmed reachable from this network first.
 TELEGRAM_PIN_IP = _bool("TELEGRAM_PIN_IP", True)
-TELEGRAM_API_IP = os.getenv("TELEGRAM_API_IP", "149.154.167.220").strip()
+_DEFAULT_TELEGRAM_IPS = (
+    "149.154.167.222,149.154.175.50,91.108.4.196,149.154.161.144,"
+    "149.154.167.220,149.154.167.221,149.154.166.110,149.154.171.5,95.161.76.100"
+)
+TELEGRAM_API_IPS = [
+    ip.strip() for ip in os.getenv("TELEGRAM_API_IPS", _DEFAULT_TELEGRAM_IPS).split(",") if ip.strip()
+]
 
 # --- Life Pilot -------------------------------------------------------------
 # Same compose project, so the service name resolves on the shared network.
