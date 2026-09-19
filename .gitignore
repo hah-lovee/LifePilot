@@ -1,6 +1,5 @@
 # Python
-backend/.venv/
-backend/__pycache__/
+**/.venv/
 **/__pycache__/
 *.pyc
 
@@ -27,3 +26,16 @@ backend/uploads/
 
 # Claude Code local state
 .claude/
+
+# Docker image archives (docker save) — moved here from the repo root,
+# regenerated on demand, far too large for git.
+containers/
+
+# Database dumps / backups (pg_dump output, etc.)
+backups/
+
+# trading-keys-api is its own git repository, checked out here for local
+# deploys (see deploy_trading_api.py). Not a submodule on purpose.
+trading-keys-api/
+
+voice-bot-spec.md
