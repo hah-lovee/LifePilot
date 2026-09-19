@@ -5,7 +5,7 @@
 - `backend/` — FastAPI (Python), SQLAlchemy 2.0, Alembic, PostgreSQL.
 - `frontend/` — Next.js 16 (App Router, TypeScript, Tailwind), все страницы — клиентские компоненты, ходят в backend по REST с JWT в `localStorage`.
 - `infra/` — `docker-compose.yml`, `Caddyfile`, `.env.example` для продакшен-разворачивания на VPS.
-- `docs/` — этот файл.
+- `docs/` — этот файл (почему так устроено) и `CODE_GUIDE.md` (как с этим работать).
 
 ## Почему такой стек
 
