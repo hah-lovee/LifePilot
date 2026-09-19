@@ -15,6 +15,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 
+# Stamped at build time with the git ref, so the running image can be checked
+# against the source it was supposedly built from — without starting it:
+#   docker run --rm --entrypoint cat life-pilot-voice-bot:latest /app/BUILD_REF
+ARG BUILD_REF=unknown
+RUN echo "$BUILD_REF" > /app/BUILD_REF
+
 # Unbuffered so `docker compose logs -f` shows the pipeline in real time.
 ENV PYTHONUNBUFFERED=1
 

@@ -19,6 +19,8 @@ services:
   backend:
     build:
       context: ../backend
+      args:
+        BUILD_REF: ${BUILD_REF:-unknown}
     restart: unless-stopped
     env_file:
       - .env
@@ -40,6 +42,8 @@ services:
   voice-bot:
     build:
       context: ../voice-bot
+      args:
+        BUILD_REF: ${BUILD_REF:-unknown}
     restart: unless-stopped
     env_file:
       - .env

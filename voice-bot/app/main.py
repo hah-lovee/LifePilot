@@ -10,6 +10,7 @@ import logging
 import time
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
+from pathlib import Path
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.session.aiohttp import AiohttpSession
@@ -24,6 +25,17 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
 )
 logger = logging.getLogger("voice-bot")
+
+
+def _build_ref() -> str:
+    """Written into the image at build time (see Dockerfile). Logged on every
+    start so "is the new code actually running?" is answered by the log rather
+    than inferred from which wording a message happens to use."""
+    try:
+        return Path("/app/BUILD_REF").read_text(encoding="utf-8").strip() or "unknown"
+    except OSError:
+        return "dev"
+
 
 # Telegram redelivers anything unconfirmed for up to 24h. After an outage that
 # backlog is worse than useless: resolve_entry_date() stamps reports with
@@ -181,8 +193,8 @@ async def handle_text(message: Message) -> None:
 async def main() -> None:
     telegram_net.install()
     logger.info(
-        "Starting: model=%s, fillers=%d, log=%s",
-        config.OLLAMA_MODEL, len(fillers.FILLER_WORDS), config.FILLER_LOG_PATH,
+        "Starting build=%s: model=%s, fillers=%d, log=%s",
+        _build_ref(), config.OLLAMA_MODEL, len(fillers.FILLER_WORDS), config.FILLER_LOG_PATH,
     )
 
     bot = Bot(token=config.TELEGRAM_BOT_TOKEN, session=AiohttpSession(timeout=config.TELEGRAM_TIMEOUT))

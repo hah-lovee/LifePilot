@@ -1,5 +1,6 @@
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -54,6 +55,15 @@ app.include_router(telegram_router)
 app.include_router(integrations_router)
 
 
+def _build_ref() -> str:
+    """Written into the image at build time (see Dockerfile) so a deployment
+    can be identified without shelling into the container."""
+    try:
+        return Path("/app/BUILD_REF").read_text(encoding="utf-8").strip() or "unknown"
+    except OSError:
+        return "dev"
+
+
 @app.get("/api/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return {"status": "ok", "build": _build_ref()}
