@@ -103,6 +103,12 @@ def outbound(server: dict, tag: str) -> dict:
                 "shortId": server["short_id"],
                 "spiderX": server["spider_x"],
             },
+            # The VM advertises an IPv6 route that drops packets — the same
+            # fault the backend's Telegram client documents and works around by
+            # forcing IPv4 in Python. Xray has no such patch applied to it, so
+            # without this it resolves the subscription's hostnames to AAAA
+            # records and every handshake dies on a route to nowhere.
+            "sockopt": {"domainStrategy": "ForceIPv4"},
         },
     }
 
@@ -110,7 +116,13 @@ def outbound(server: dict, tag: str) -> dict:
 def build_config(servers: list[dict], http_port: int, socks_port: int) -> dict:
     tags = [f"vpn{i}" for i in range(len(servers))]
     return {
-        "log": {"loglevel": "warning"},
+        # info, not warning: the observatory reports which servers are alive at
+        # this level, and that is the one thing worth being able to see when
+        # nothing works. Nothing here is per-request, so it stays quiet.
+        "log": {"loglevel": "info"},
+        # Belt and braces with sockopt.domainStrategy above: resolve nothing to
+        # AAAA, because this host's IPv6 route silently discards packets.
+        "dns": {"servers": ["1.1.1.1", "8.8.8.8"], "queryStrategy": "UseIPv4"},
         "inbounds": [
             {
                 # 0.0.0.0 is safe here: the container is only on the internal
@@ -131,7 +143,11 @@ def build_config(servers: list[dict], http_port: int, socks_port: int) -> dict:
             },
         ],
         "outbounds": [outbound(s, t) for s, t in zip(servers, tags)]
-        + [{"tag": "direct", "protocol": "freedom"}],
+        + [{
+            "tag": "direct",
+            "protocol": "freedom",
+            "settings": {"domainStrategy": "UseIPv4"},
+        }],
         # Health-checks every server and keeps the balancer pointed at ones that
         # actually respond, so a dead node costs one probe rather than every
         # request until someone notices.
