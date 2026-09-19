@@ -114,12 +114,20 @@ def _invalidate() -> None:
 
 
 def _probing_getaddrinfo(host, *args, **kwargs):
-    if host == _TELEGRAM_HOST:
+    # With a proxy configured the hostname is resolved at the proxy's end, so
+    # rewriting it here would be both pointless and wrong.
+    if host == _TELEGRAM_HOST and not settings.telegram_proxy:
         host = _resolve()
     return _original_getaddrinfo(host, *args, **kwargs)
 
 
 socket.getaddrinfo = _probing_getaddrinfo
+
+
+def _proxies() -> dict | None:
+    if not settings.telegram_proxy:
+        return None
+    return {"http": settings.telegram_proxy, "https": settings.telegram_proxy}
 
 
 def _api_url(method: str) -> str:
@@ -138,12 +146,16 @@ def send_message(chat_id: str, text: str) -> None:
         return
     try:
         resp = requests.post(
-            _api_url("sendMessage"), json={"chat_id": chat_id, "text": text}, timeout=_REQUEST_TIMEOUT
+            _api_url("sendMessage"),
+            json={"chat_id": chat_id, "text": text},
+            timeout=_REQUEST_TIMEOUT,
+            proxies=_proxies(),
         )
         if not resp.ok:
             logger.warning("Telegram sendMessage failed for chat_id=%s: %s", chat_id, resp.text)
     except requests.exceptions.RequestException:
         logger.exception("Telegram sendMessage request failed for chat_id=%s", chat_id)
         # Most likely the chosen address stopped answering; the next reminder
-        # then re-probes instead of retrying a dead IP forever.
+        # then re-probes instead of retrying a dead IP forever. No-op when a
+        # proxy is in use, since no address was chosen here.
         _invalidate()

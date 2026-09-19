@@ -58,6 +58,17 @@ Life Pilot — только про дневник. Вся склейка жив�
 обнаружив там собственный шлюз, скажет об этом прямо вместо того, чтобы молча
 стучаться не на ту машину.
 
+**Telegram с VM не работает без прокси.** Измерено многократно: TCP-соединение
+до `api.telegram.org` устанавливается мгновенно, а следующий реальный запрос
+висит до таймаута — похоже на DPI, режущий сессию после TLS-handshake. С ПК,
+где трафик идёт через VPN, те же адреса отвечают за 0.01 с. Поэтому подбор
+адресов проблему не решает: «живой» адрес перестаёт работать через минуту.
+
+Лечение — `TELEGRAM_PROXY`: трафик уходит через `tools/telegram-proxy.py` на
+ПК. Это чинит заодно и напоминания о привычках, которые шлёт backend и которые
+ломались молча по той же причине. Когда прокси задан, подбор адресов
+отключается — имя резолвит прокси на своей стороне. Настройка — в конце файла.
+
 **Отчёт дописывается, а не затирает.** Запись дневника одна на дату, поэтому
 второй отчёт за день добавляется в конец с отметкой времени. Числовые оценки
 перезаписываются последним значением, а поля, про которые в речи не сказано
@@ -124,6 +135,7 @@ docker compose logs -f voice-bot
 |---|---|
 | `Route lookup returned ... this container's own gateway` | Не задан `HOST_GW`; см. раздел про адрес хоста |
 | `Whisper недоступен` | Сервис на хосте не поднят, или файрвол Windows закрыл порт 8100 |
+| `No reachable address for api.telegram.org` | Провайдер режет Telegram — поднимите прокси, см. ниже |
 | `No Life Pilot account is linked to this Telegram chat` | Не пройдена привязка `/start <код>` |
 | `Integration API is not configured` | Пустой `INTEGRATION_API_KEY` на стороне backend |
 | Бот молчит | Проверьте, что backend больше не поллит: он не должен вызывать `getUpdates` |
@@ -135,3 +147,45 @@ docker compose exec voice-bot tail -n 5 /data/fillers.jsonl
 ```
 
 Аналитика по этому файлу — отдельная задача, здесь только накопление.
+
+## Прокси для Telegram (на ПК)
+
+```powershell
+python C:\Users\PC\Desktop\LifePilot2\tools\telegram-proxy.py
+```
+
+Слушает `0.0.0.0:8889`, пропускает только `CONNECT api.telegram.org:443` и
+только из частных подсетей — открытым релеем стать не может. Порт надо открыть
+в брандмауэре (один раз, из PowerShell от администратора):
+
+```powershell
+New-NetFirewallRule -DisplayName "Telegram proxy for VM" -Direction Inbound -Protocol TCP -LocalPort 8889 -Action Allow
+```
+
+Автозапуск при входе в систему:
+
+```powershell
+schtasks /Create /TN "Telegram proxy for VM" /SC ONLOGON /RL HIGHEST /F /TR "pythonw C:\Users\PC\Desktop\LifePilot2\tools\telegram-proxy.py"
+```
+
+`ONLOGON`, а не `ONSTART`: VPN поднимается в пользовательской сессии, и запуск
+от SYSTEM до входа пойдёт мимо него.
+
+Затем в `infra/.env` на VM — адрес тот же, что уже лежит в `HOST_GW`, там же
+крутятся Whisper и Ollama:
+
+```
+TELEGRAM_PROXY=http://172.24.160.1:8889
+```
+
+Проверить с VM, что туннель работает:
+
+```bash
+docker compose exec voice-bot python -c "
+import urllib.request, os
+o = urllib.request.build_opener(urllib.request.ProxyHandler({'https': os.environ['TELEGRAM_PROXY']}))
+print(o.open('https://api.telegram.org/bot123:fake/getMe', timeout=30).read())"
+```
+
+Ожидаемый ответ — `401 Unauthorized` от Telegram. Токен намеренно фальшивый;
+важно, что ответ вообще пришёл — значит, туннель проходит насквозь.

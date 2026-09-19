@@ -219,7 +219,10 @@ async def main() -> None:
         _build_ref(), config.OLLAMA_MODEL, len(fillers.FILLER_WORDS), config.FILLER_LOG_PATH,
     )
 
-    bot = Bot(token=config.TELEGRAM_BOT_TOKEN, session=AiohttpSession(timeout=config.TELEGRAM_TIMEOUT))
+    if config.TELEGRAM_PROXY:
+        logger.info("Routing Telegram traffic through %s", config.TELEGRAM_PROXY)
+    session = AiohttpSession(timeout=config.TELEGRAM_TIMEOUT, proxy=config.TELEGRAM_PROXY or None)
+    bot = Bot(token=config.TELEGRAM_BOT_TOKEN, session=session)
     backoff = _MIN_BACKOFF
     try:
         while True:

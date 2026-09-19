@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     # API disabled, which is the right default for anyone not running the bot.
     integration_api_key: str = ""
 
+    # When set (e.g. http://172.24.160.1:8889), habit reminders tunnel to
+    # Telegram through tools/telegram-proxy.py on the dev PC. This network
+    # filters Telegram hard enough that reminders otherwise fail silently.
+    telegram_proxy: str = ""
+
     telegram_bot_token: str = ""
     telegram_bot_username: str = ""  # без "@", для ссылки-приглашения t.me/<username>
 

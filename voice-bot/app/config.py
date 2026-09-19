@@ -31,7 +31,13 @@ ALLOWED_TELEGRAM_ID = _require("ALLOWED_TELEGRAM_ID")
 # results plus these fallbacks and uses the first that accepts a connection, so
 # this list is a safety net for when DNS itself is unavailable rather than a
 # pin. Ordered with addresses confirmed reachable from this network first.
-TELEGRAM_PIN_IP = _bool("TELEGRAM_PIN_IP", True)
+# When set (e.g. http://172.24.160.1:8889), all Telegram traffic tunnels
+# through tools/telegram-proxy.py on the dev PC, whose VPN reaches Telegram
+# cleanly. This makes address probing irrelevant — the proxy resolves the
+# hostname at its end — so setting it disables the pinning below.
+TELEGRAM_PROXY = os.getenv("TELEGRAM_PROXY", "").strip()
+
+TELEGRAM_PIN_IP = _bool("TELEGRAM_PIN_IP", not TELEGRAM_PROXY)
 _DEFAULT_TELEGRAM_IPS = (
     "149.154.167.222,149.154.175.50,91.108.4.196,149.154.161.144,"
     "149.154.167.220,149.154.167.221,149.154.166.110,149.154.171.5,95.161.76.100"
