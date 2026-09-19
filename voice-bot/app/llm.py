@@ -166,4 +166,11 @@ async def parse_report(text: str, allowed_tags: list[str]) -> dict:
         raise LLMError(f"Ollama ответила {exc.response.status_code}") from exc
 
     content = resp.json().get("message", {}).get("content", "")
-    return normalize(_extract_json(content), allowed_tags)
+    data = _extract_json(content)
+    if not data.get("summary"):
+        # The model produced valid JSON but no usable summary — it either set it
+        # to null or put the text under a key we don't read. Log the shape it
+        # actually returned, since the caller can only see that the field came
+        # back empty.
+        logger.warning("Model returned no summary. Keys: %s | raw: %s", list(data), content[:400])
+    return normalize(data, allowed_tags)
