@@ -48,6 +48,14 @@ _original_getaddrinfo = socket.getaddrinfo
 _resolve_lock = threading.Lock()
 _current_ip: str | None = None
 
+# When nothing answers, remember that for a while. The poller runs every 15s and
+# a full probe takes 20s, so without this an unreachable Telegram means the VM
+# probes back-to-back forever — pointless network churn and a traceback in the
+# log every quarter minute. Long enough to stay quiet, short enough that the
+# link coming back is noticed within a couple of minutes.
+_FAILURE_TTL = 120.0
+_last_failure_at: float = 0.0
+
 
 def _probe(ip: str) -> tuple[str, bool, float]:
     started = time.monotonic()
@@ -93,15 +101,27 @@ def _pick_ip() -> str:
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
 
-    logger.error("No reachable address for %s. Failed: %s", _TELEGRAM_HOST, ", ".join(failed) or "(all timed out)")
+    # warning, not error: on this network it is the steady state, not an event.
+    logger.warning("No reachable address for %s among %d candidates", _TELEGRAM_HOST, len(candidates))
     raise OSError(f"No address for {_TELEGRAM_HOST} answered on port {_PROBE_PORT} within {_PROBE_TIMEOUT:.0f}s")
 
 
 def _resolve() -> str:
-    global _current_ip
+    global _current_ip, _last_failure_at
     with _resolve_lock:
-        if _current_ip is None:
+        if _current_ip is not None:
+            return _current_ip
+        since_failure = time.monotonic() - _last_failure_at
+        if since_failure < _FAILURE_TTL:
+            raise OSError(
+                f"{_TELEGRAM_HOST} was unreachable {since_failure:.0f}s ago; "
+                f"not probing again for another {_FAILURE_TTL - since_failure:.0f}s"
+            )
+        try:
             _current_ip = _pick_ip()
+        except OSError:
+            _last_failure_at = time.monotonic()
+            raise
         return _current_ip
 
 
@@ -143,8 +163,8 @@ def send_message(chat_id: str, text: str) -> None:
         )
         if not resp.ok:
             logger.warning("Telegram sendMessage failed for chat_id=%s: %s", chat_id, resp.text)
-    except requests.exceptions.RequestException:
-        logger.exception("Telegram sendMessage request failed for chat_id=%s", chat_id)
+    except requests.exceptions.RequestException as exc:
+        logger.warning("Telegram sendMessage failed for chat_id=%s: %s", chat_id, exc)
         # Most likely the chosen address stopped answering; the next reminder
         # then re-probes instead of retrying a dead IP forever.
         _invalidate()
@@ -161,8 +181,9 @@ def get_updates(offset: int | None, timeout: int = 0) -> list[dict]:
         resp = requests.get(_api_url("getUpdates"), params=params, timeout=timeout + _REQUEST_TIMEOUT)
         resp.raise_for_status()
         return resp.json().get("result", [])
-    except requests.exceptions.RequestException:
-        logger.exception("Telegram getUpdates request failed")
-        # The chosen address may have gone dark; re-probe before the next poll.
+    except requests.exceptions.RequestException as exc:
+        # Not logger.exception: this fires every poll while Telegram is down,
+        # and a full traceback every 15 seconds buries everything else.
+        logger.warning("Telegram getUpdates failed: %s", exc)
         _invalidate()
         return []
