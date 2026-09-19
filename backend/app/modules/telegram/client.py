@@ -130,6 +130,18 @@ def _proxies() -> dict | None:
     return {"http": settings.telegram_proxy, "https": settings.telegram_proxy}
 
 
+def _post_send(chat_id: str, text: str, proxies: dict | None) -> bool:
+    resp = requests.post(
+        _api_url("sendMessage"),
+        json={"chat_id": chat_id, "text": text},
+        timeout=_REQUEST_TIMEOUT,
+        proxies=proxies,
+    )
+    if not resp.ok:
+        logger.warning("Telegram sendMessage failed for chat_id=%s: %s", chat_id, resp.text)
+    return resp.ok
+
+
 def _api_url(method: str) -> str:
     return f"https://api.telegram.org/bot{settings.telegram_bot_token}/{method}"
 
@@ -144,18 +156,22 @@ _REQUEST_TIMEOUT = 60
 def send_message(chat_id: str, text: str) -> None:
     if not settings.telegram_bot_token:
         return
+
+    proxies = _proxies()
+    if proxies:
+        # The proxy sits on a PC whose VPN is not always up, and without it the
+        # proxy reaches Telegram no better than we would. So try it, but treat
+        # it as an optimisation rather than the only route.
+        try:
+            if _post_send(chat_id, text, proxies):
+                return
+        except requests.exceptions.RequestException as exc:
+            logger.warning("Telegram via proxy failed (%s); trying direct", exc)
+
     try:
-        resp = requests.post(
-            _api_url("sendMessage"),
-            json={"chat_id": chat_id, "text": text},
-            timeout=_REQUEST_TIMEOUT,
-            proxies=_proxies(),
-        )
-        if not resp.ok:
-            logger.warning("Telegram sendMessage failed for chat_id=%s: %s", chat_id, resp.text)
+        _post_send(chat_id, text, None)
     except requests.exceptions.RequestException:
         logger.exception("Telegram sendMessage request failed for chat_id=%s", chat_id)
         # Most likely the chosen address stopped answering; the next reminder
-        # then re-probes instead of retrying a dead IP forever. No-op when a
-        # proxy is in use, since no address was chosen here.
+        # then re-probes instead of retrying a dead IP forever.
         _invalidate()

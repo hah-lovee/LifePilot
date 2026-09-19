@@ -212,6 +212,30 @@ async def handle_text(message: Message) -> None:
     await _run(message, text=message.text)
 
 
+async def _make_bot() -> Bot:
+    """Build a Bot routed through the proxy when that actually works today.
+
+    The proxy runs on a PC whose VPN is not always on, and without the VPN it
+    reaches Telegram no better than we do. So this is checked rather than
+    assumed, and re-checked on every reconnect: with the proxy up we use it and
+    address probing is pointless; without it we fall back to probing addresses
+    directly, which is worse but not nothing.
+    """
+    proxy = config.TELEGRAM_PROXY or None
+    if proxy:
+        # Blocking socket work — off the event loop.
+        usable = await asyncio.to_thread(telegram_net.proxy_usable, proxy)
+        if usable:
+            logger.info("Routing Telegram traffic through %s", proxy)
+        else:
+            logger.warning("Proxy %s not usable (VPN down?); falling back to direct", proxy)
+            proxy = None
+
+    telegram_net.set_pinning(proxy is None)
+    session = AiohttpSession(timeout=config.TELEGRAM_TIMEOUT, proxy=proxy)
+    return Bot(token=config.TELEGRAM_BOT_TOKEN, session=session)
+
+
 async def main() -> None:
     telegram_net.install()
     logger.info(
@@ -219,10 +243,7 @@ async def main() -> None:
         _build_ref(), config.OLLAMA_MODEL, len(fillers.FILLER_WORDS), config.FILLER_LOG_PATH,
     )
 
-    if config.TELEGRAM_PROXY:
-        logger.info("Routing Telegram traffic through %s", config.TELEGRAM_PROXY)
-    session = AiohttpSession(timeout=config.TELEGRAM_TIMEOUT, proxy=config.TELEGRAM_PROXY or None)
-    bot = Bot(token=config.TELEGRAM_BOT_TOKEN, session=session)
+    bot = await _make_bot()
     backoff = _MIN_BACKOFF
     try:
         while True:
@@ -246,6 +267,10 @@ async def main() -> None:
                 telegram_net.invalidate()
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, _MAX_BACKOFF)
+                # Re-decide proxy vs direct: the VPN behind the proxy comes and
+                # goes, and a reconnect is exactly when that may have changed.
+                await bot.session.close()
+                bot = await _make_bot()
     finally:
         await bot.session.close()
 

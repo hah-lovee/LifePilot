@@ -25,6 +25,7 @@ import socket
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urlsplit
 
 from app import config
 
@@ -39,6 +40,47 @@ _original_getaddrinfo = socket.getaddrinfo
 _lock = threading.Lock()
 _current_ip: str | None = None
 _installed = False
+
+# Whether to rewrite api.telegram.org to a probed address. Off while traffic
+# goes through a proxy (which resolves the name at its end) and switched back
+# on when we fall back to a direct connection — the VPN behind the proxy is not
+# always up, so this flips at runtime rather than being decided at import.
+_pinning = config.TELEGRAM_PIN_IP
+
+
+def set_pinning(enabled: bool) -> None:
+    global _pinning
+    if _pinning != enabled:
+        logger.info("Address probing %s", "enabled" if enabled else "disabled (using proxy)")
+    _pinning = enabled
+
+
+def proxy_usable(proxy_url: str, timeout: float = 8.0) -> bool:
+    """Can we actually reach Telegram through this proxy right now?
+
+    Not just "is the port open": the proxy lives on a PC whose VPN may be off,
+    in which case it accepts the connection and then fails to reach Telegram
+    exactly like we would. So ask it to open the tunnel and see what it says.
+    """
+    parsed = urlsplit(proxy_url if "://" in proxy_url else f"http://{proxy_url}")
+    host, port = parsed.hostname, parsed.port or 8889
+    if not host:
+        logger.warning("Cannot parse TELEGRAM_PROXY=%r", proxy_url)
+        return False
+    try:
+        with socket.create_connection((host, port), timeout) as sock:
+            sock.settimeout(timeout)
+            target = _TELEGRAM_HOSTS[0]
+            sock.sendall(f"CONNECT {target}:443 HTTP/1.1\r\nHost: {target}:443\r\n\r\n".encode())
+            response = sock.recv(256).decode("latin-1", "replace")
+    except OSError as exc:
+        logger.warning("Proxy %s:%s unreachable: %s", host, port, exc)
+        return False
+
+    ok = " 200 " in response.split("\r\n")[0]
+    if not ok:
+        logger.warning("Proxy %s:%s refused the tunnel: %s", host, port, response.split("\r\n")[0])
+    return ok
 
 
 def _probe(ip: str) -> tuple[str, bool, float]:
@@ -130,7 +172,7 @@ def install() -> None:
         return
 
     def patched(host, port, family=0, type=0, proto=0, flags=0):  # noqa: A002
-        if config.TELEGRAM_PIN_IP and host in _TELEGRAM_HOSTS:
+        if _pinning and host in _TELEGRAM_HOSTS:
             # Only the connect() target changes — Host header and TLS SNI still
             # say api.telegram.org, so certificate validation is unaffected.
             host = resolve()
@@ -142,7 +184,4 @@ def install() -> None:
 
     socket.getaddrinfo = patched
     _installed = True
-    if config.TELEGRAM_PIN_IP:
-        logger.info("Telegram address probing enabled (IPv4 only)")
-    else:
-        logger.info("Telegram address probing disabled; plain DNS, IPv4 only")
+    logger.info("IPv4 forced for all outbound traffic; address probing=%s", _pinning)

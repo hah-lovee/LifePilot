@@ -6,3 +6,7 @@
 # app/telegram_net.py) that a patched stdlib resolver applies transparently.
 aiogram>=3.13,<4
 httpx>=0.27
+# aiogram routes all proxy support through this, including plain HTTP CONNECT
+# proxies — without it AiohttpSession(proxy=...) raises at construction. Also
+# buys SOCKS support, should the VPN offer a SOCKS port instead.
+aiohttp-socks>=0.9

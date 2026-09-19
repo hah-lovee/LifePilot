@@ -63,9 +63,31 @@ CONNECT_TIMEOUT = 15
 IDLE_TIMEOUT = 300
 BUFFER = 65536
 
+def _log_destination() -> str | None:
+    """Where to write the log, or None for the console.
+
+    Under pythonw — which is how the scheduled task runs it, to avoid a console
+    window at every logon — there is no stderr at all, so console logging would
+    silently discard everything. Fall back to a file in that case rather than
+    leaving a background process that cannot be diagnosed.
+    """
+    explicit = os.getenv("PROXY_LOG_FILE", "").strip()
+    if explicit:
+        return explicit
+    if sys.stderr is None or not getattr(sys.stderr, "fileno", None):
+        return os.path.join(os.getenv("TEMP", "."), "telegram-proxy.log")
+    try:
+        sys.stderr.fileno()
+    except (OSError, ValueError):
+        return os.path.join(os.getenv("TEMP", "."), "telegram-proxy.log")
+    return None
+
+
+_LOG_FILE = _log_destination()
 logging.basicConfig(
     level=os.getenv("PROXY_LOG_LEVEL", "INFO"),
     format="%(asctime)s %(levelname)-7s %(message)s",
+    **({"filename": _LOG_FILE, "encoding": "utf-8"} if _LOG_FILE else {}),
 )
 logger = logging.getLogger("telegram-proxy")
 
