@@ -72,7 +72,14 @@ HOST_ROUTE_FILE = os.getenv("HOST_ROUTE_FILE", "/host/net/route").strip()
 WHISPER_TIMEOUT = _int("WHISPER_TIMEOUT", 300)
 OLLAMA_TIMEOUT = _int("OLLAMA_TIMEOUT", 300)
 LIFEPILOT_TIMEOUT = _int("LIFEPILOT_TIMEOUT", 30)
-TELEGRAM_TIMEOUT = _int("TELEGRAM_TIMEOUT", 120)
+# Deliberately not generous. Measured on this link, a call that works connects
+# in well under a second; a call that fails hangs until the timeout. So a long
+# timeout buys nothing and costs everything — at 120s a single dead address
+# swallowed a whole report before anything could retry. Short timeout plus
+# re-probing retries (see _telegram in main.py) gets three chances on three
+# different addresses in less time than one attempt used to take. Must stay
+# above the 30s long-polling window.
+TELEGRAM_TIMEOUT = _int("TELEGRAM_TIMEOUT", 45)
 
 # --- Diary ------------------------------------------------------------------
 # A report dictated at 00:30 is about the day that just ended, not the one that

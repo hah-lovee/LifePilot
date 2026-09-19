@@ -118,47 +118,69 @@ async def handle_fillers(message: Message) -> None:
     await message.answer("Считаю такие слова:\n" + ", ".join(fillers.FILLER_WORDS))
 
 
-async def _download(bot: Bot, payload) -> bytes:
-    """Fetch the voice note, re-probing once if Telegram drops mid-download.
+async def _telegram(call, *, what: str, attempts: int = 3):
+    """Run one Telegram API call, re-probing the address between attempts.
 
-    getFile and the file download go over the same throttled, intermittently
-    filtered link as everything else, and the address that was answering when
-    polling started can stop answering by the time a voice note arrives. One
-    retry after invalidating costs a probe; without it the report is simply
-    lost.
+    Every call to Telegram from here is individually unreliable: the address
+    chosen when polling started routinely stops answering minutes later, and
+    the failure looks like a connect that hangs until the timeout. Retrying
+    without invalidating would just hammer the same dead address, so each
+    attempt gets a freshly probed one.
+
+    Deliberately wraps *every* call rather than the ones that have bitten us so
+    far — twice now a single unguarded await has been enough to swallow a whole
+    report.
     """
-    for attempt in (1, 2):
-        buffer = BytesIO()
+    for attempt in range(1, attempts + 1):
         try:
-            await bot.download(payload, destination=buffer)
-            return buffer.getvalue()
-        except TelegramNetworkError:
-            if attempt == 2:
+            return await call()
+        except TelegramNetworkError as exc:
+            if attempt == attempts:
                 raise
-            logger.warning("Voice download failed; re-probing Telegram and retrying once")
+            logger.warning("%s failed (%s); re-probing, attempt %d/%d", what, exc, attempt, attempts)
             telegram_net.invalidate()
     raise AssertionError("unreachable")
 
 
+async def _download(bot: Bot, payload) -> bytes:
+    async def once() -> bytes:
+        buffer = BytesIO()
+        await bot.download(payload, destination=buffer)
+        return buffer.getvalue()
+
+    return await _telegram(once, what="Voice download")
+
+
 async def _run(message: Message, *, text: str | None = None, payload=None, bot: Bot | None = None) -> None:
-    status = await message.answer("⏳ Обрабатываю…")
+    # Best-effort: if the "working on it" message can't be delivered, that is no
+    # reason to drop the report. Whisper, Ollama and Life Pilot are all on the
+    # LAN and unaffected by whatever Telegram is doing, so the day's entry can
+    # still be saved even when we can't say so.
+    status = None
     try:
-        # Downloading inside the guarded block on purpose: it used to sit in the
-        # handler, so a timeout here escaped the handler entirely and the sender
-        # got no reply at all — just a traceback in the log.
+        status = await _telegram(lambda: message.answer("⏳ Обрабатываю…"), what="Status message")
+    except TelegramNetworkError as exc:
+        logger.warning("Could not send the status message (%s); processing anyway", exc)
+
+    try:
         audio = await _download(bot, payload) if payload is not None else None
         reply = await pipeline.handle_report(str(message.chat.id), text=text, audio=audio)
     except TelegramNetworkError as exc:
-        telegram_net.invalidate()
         logger.warning("Telegram network error while handling a report: %s", exc)
-        reply = "⚠️ Связь с Telegram оборвалась на полпути. Пришли ещё раз — адрес переподобран."
+        reply = "⚠️ Связь с Telegram оборвалась на полпути. Пришли голосовое ещё раз."
     except Exception as exc:  # noqa: BLE001 — surfaced to the user verbatim
         logger.exception("Report processing failed")
         reply = f"⚠️ Не получилось: {exc}"
+
     try:
-        await status.edit_text(reply)
-    except Exception:  # noqa: BLE001 — editing can fail, the content matters more
-        await message.answer(reply)
+        if status is not None:
+            await _telegram(lambda: status.edit_text(reply), what="Reply")
+        else:
+            await _telegram(lambda: message.answer(reply), what="Reply")
+    except Exception:  # noqa: BLE001
+        # The report itself may well be saved by now, so log what the sender
+        # was supposed to see rather than losing it with the failed delivery.
+        logger.error("Could not deliver the reply. It said: %s", reply)
 
 
 @dp.message(F.voice | F.audio)
