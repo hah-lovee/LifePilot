@@ -1,6 +1,8 @@
 import logging
 import socket
 import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 import urllib3.util.connection as urllib3_cn
@@ -33,7 +35,7 @@ urllib3_cn.allowed_gai_family = lambda: socket.AF_INET
 # is unaffected — only the actual connect() target changes.
 _TELEGRAM_HOST = "api.telegram.org"
 _PROBE_PORT = 443
-_PROBE_TIMEOUT = 5.0
+_PROBE_TIMEOUT = 20.0
 _FALLBACK_IPS = (
     "149.154.167.222", "149.154.175.50", "91.108.4.196", "149.154.161.144",
     "149.154.167.220", "149.154.167.221", "149.154.166.110", "149.154.171.5",
@@ -47,15 +49,23 @@ _resolve_lock = threading.Lock()
 _current_ip: str | None = None
 
 
-def _probe(ip: str) -> bool:
+def _probe(ip: str) -> tuple[str, bool, float]:
+    started = time.monotonic()
     try:
         socket.create_connection((ip, _PROBE_PORT), _PROBE_TIMEOUT).close()
-        return True
+        return ip, True, time.monotonic() - started
     except OSError:
-        return False
+        return ip, False, time.monotonic() - started
 
 
 def _pick_ip() -> str:
+    """Probe every candidate at once and take the first that answers.
+
+    Telegram is throttled hard enough from this host that a *successful*
+    connect can take many seconds, so the per-probe timeout has to be generous
+    — and sequentially that would mean minutes before reaching a live address
+    when the dead ones come first. In parallel it costs one timeout total.
+    """
     candidates: list[str] = []
     try:
         for info in _original_getaddrinfo(_TELEGRAM_HOST, _PROBE_PORT, socket.AF_INET, socket.SOCK_STREAM):
@@ -68,11 +78,23 @@ def _pick_ip() -> str:
         if ip not in candidates:
             candidates.append(ip)
 
-    for ip in candidates:
-        if _probe(ip):
-            logger.info("Using %s for %s", ip, _TELEGRAM_HOST)
-            return ip
-    raise OSError(f"No reachable address for {_TELEGRAM_HOST} among: {', '.join(candidates)}")
+    pool = ThreadPoolExecutor(max_workers=min(len(candidates), 16))
+    failed: list[str] = []
+    try:
+        futures = [pool.submit(_probe, ip) for ip in candidates]
+        for future in as_completed(futures, timeout=_PROBE_TIMEOUT + 5):
+            ip, ok, elapsed = future.result()
+            if ok:
+                logger.info("Using %s for %s (connected in %.1fs)", ip, _TELEGRAM_HOST, elapsed)
+                return ip
+            failed.append(ip)
+    except TimeoutError:
+        pass
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+
+    logger.error("No reachable address for %s. Failed: %s", _TELEGRAM_HOST, ", ".join(failed) or "(all timed out)")
+    raise OSError(f"No address for {_TELEGRAM_HOST} answered on port {_PROBE_PORT} within {_PROBE_TIMEOUT:.0f}s")
 
 
 def _resolve() -> str:

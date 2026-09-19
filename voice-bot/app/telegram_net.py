@@ -23,13 +23,14 @@ voice-file downloads alike, without depending on aiogram's session internals.
 import logging
 import socket
 import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from app import config
 
 logger = logging.getLogger(__name__)
 
 _TELEGRAM_HOSTS = ("api.telegram.org",)
-_PROBE_TIMEOUT = 5.0
 _PROBE_PORT = 443
 
 # Captured before patching so probing and DNS lookups below don't recurse.
@@ -40,12 +41,13 @@ _current_ip: str | None = None
 _installed = False
 
 
-def _probe(ip: str) -> bool:
+def _probe(ip: str) -> tuple[str, bool, float]:
+    started = time.monotonic()
     try:
-        socket.create_connection((ip, _PROBE_PORT), _PROBE_TIMEOUT).close()
-        return True
+        socket.create_connection((ip, _PROBE_PORT), config.TELEGRAM_PROBE_TIMEOUT).close()
+        return ip, True, time.monotonic() - started
     except OSError:
-        return False
+        return ip, False, time.monotonic() - started
 
 
 def _candidates() -> list[str]:
@@ -67,16 +69,40 @@ def _candidates() -> list[str]:
 
 
 def _pick() -> str:
+    """Probe all candidates at once and take the first to answer.
+
+    Sequentially was a mistake: this link throttles Telegram hard enough that a
+    successful connect can take many seconds (the backend measured ~40s for a
+    plain getMe), so the timeout has to be generous — and a generous timeout
+    times nine candidates meant the whole probe outran the request timeout
+    before reaching a working address. In parallel the wall-clock cost is one
+    timeout regardless of how many addresses are dark.
+    """
     candidates = _candidates()
-    logger.info("Probing %d candidate addresses for api.telegram.org", len(candidates))
-    for ip in candidates:
-        if _probe(ip):
-            logger.info("Using %s for api.telegram.org", ip)
-            return ip
-        logger.debug("No route to %s", ip)
+    timeout = config.TELEGRAM_PROBE_TIMEOUT
+    logger.info("Probing %d addresses for api.telegram.org (%.0fs timeout)", len(candidates), timeout)
+
+    pool = ThreadPoolExecutor(max_workers=min(len(candidates), 16))
+    failed: list[str] = []
+    try:
+        futures = [pool.submit(_probe, ip) for ip in candidates]
+        for future in as_completed(futures, timeout=timeout + 5):
+            ip, ok, elapsed = future.result()
+            if ok:
+                logger.info("Using %s for api.telegram.org (connected in %.1fs)", ip, elapsed)
+                return ip
+            failed.append(ip)
+    except TimeoutError:
+        pass
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+
+    # Logged rather than only raised: aiohttp rewraps this into a generic
+    # "Cannot connect to host" and the detail is lost by the time it surfaces.
+    logger.error("No reachable address for api.telegram.org. Failed: %s", ", ".join(failed) or "(all timed out)")
     raise OSError(
-        f"None of {len(candidates)} candidate addresses for api.telegram.org accepted a "
-        f"connection on port {_PROBE_PORT}. Tried: {', '.join(candidates)}"
+        f"None of {len(candidates)} candidate addresses for api.telegram.org answered on "
+        f"port {_PROBE_PORT} within {timeout:.0f}s"
     )
 
 

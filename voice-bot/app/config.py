@@ -39,6 +39,10 @@ _DEFAULT_TELEGRAM_IPS = (
 TELEGRAM_API_IPS = [
     ip.strip() for ip in os.getenv("TELEGRAM_API_IPS", _DEFAULT_TELEGRAM_IPS).split(",") if ip.strip()
 ]
+# Generous on purpose: this link throttles Telegram badly enough that a working
+# connect can take many seconds, and probing is done in parallel so a high
+# value costs wall-clock time only when every address is genuinely dark.
+TELEGRAM_PROBE_TIMEOUT = _int("TELEGRAM_PROBE_TIMEOUT", 20)
 
 # --- Life Pilot -------------------------------------------------------------
 # Same compose project, so the service name resolves on the shared network.
