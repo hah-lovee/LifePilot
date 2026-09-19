@@ -1,0 +1,8 @@
+# aiogram over python-telegram-bot: it is natively async (the pipeline is four
+# sequential network hops, all of which we want off the event loop), exposes
+# Bot.download_file for voice payloads without hand-rolling getFile, and its
+# transport is a plain aiohttp ClientSession — which matters here, because
+# reaching Telegram from this VM needs DNS-level intervention (see
+# app/telegram_net.py) that a patched stdlib resolver applies transparently.
+aiogram>=3.13,<4
+httpx>=0.27

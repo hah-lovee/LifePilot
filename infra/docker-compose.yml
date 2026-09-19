@@ -37,6 +37,28 @@ services:
     depends_on:
       - backend
 
+  voice-bot:
+    build:
+      context: ../voice-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Same compose project, so the backend is reachable by service name.
+      LIFEPILOT_API_URL: http://backend:8000
+    volumes:
+      # Filler-word history, on a named volume so it outlives the container.
+      - voice_bot_data:/data
+      # Whisper and Ollama run on the Hyper-V *host*, whose address changes
+      # every time that host reboots. Inside a container `ip route` describes
+      # the docker bridge (the VM itself), so we mount the VM's own route table
+      # and read the default gateway from there instead — see
+      # voice-bot/app/hostgw.py. Read-only, and re-read on a TTL so a host
+      # reboot heals without recreating this container.
+      - /proc/net/route:/host/net/route:ro
+    depends_on:
+      - backend
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -56,6 +78,7 @@ volumes:
   caddy_data:
   caddy_config:
   uploads_data:
+  voice_bot_data:
 
 # Investments module (existing parser backend) is intentionally not wired in
 # yet — it currently runs as its own 3-container stack (vault -> vault-init ->
