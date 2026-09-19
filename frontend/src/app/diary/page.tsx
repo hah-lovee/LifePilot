@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { DateNav } from "@/components/date-nav";
 import { MarkdownEditor } from "@/components/markdown-editor";
+import { VoiceCapture, type VoiceApply } from "@/components/voice-capture";
 import type { DiaryEntry, DiaryTag } from "@/lib/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -34,6 +35,16 @@ function DiaryContent() {
   const [availableTags, setAvailableTags] = useState<DiaryTag[]>([]);
   const [newTagName, setNewTagName] = useState("");
   const [dayScore, setDayScore] = useState<number | null>(null);
+  // Not edited here — that is the "Состояние" tab — but voice input can fill
+  // them, and the review panel needs the current values to know what it would
+  // overwrite. Kept in state (not a ref) so the panel re-reads them after a save.
+  const [stateFields, setStateFields] = useState({
+    mood: null as number | null,
+    energy: null as number | null,
+    body_condition: null as number | null,
+    sleep_bedtime: "",
+    sleep_wakeup: "",
+  });
   const [error, setError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
 
@@ -54,12 +65,20 @@ function DiaryContent() {
       setContent(entry.content ?? "");
       setSelectedTags(entry.tags);
       setDayScore(entry.day_score);
+      setStateFields({
+        mood: entry.mood,
+        energy: entry.energy,
+        body_condition: entry.body_condition,
+        sleep_bedtime: entry.sleep_bedtime ?? "",
+        sleep_wakeup: entry.sleep_wakeup ?? "",
+      });
       lastSavedRef.current = stateKey(entry.content ?? "", entry.tags);
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
         setContent("");
         setSelectedTags([]);
         setDayScore(null);
+        setStateFields({ mood: null, energy: null, body_condition: null, sleep_bedtime: "", sleep_wakeup: "" });
         lastSavedRef.current = stateKey("", []);
       } else {
         setError(err instanceof ApiError ? err.message : "Ошибка загрузки записи");
@@ -111,6 +130,42 @@ function DiaryContent() {
     };
   }, [content, selectedTags, doSave]);
 
+  async function applyVoice(fields: VoiceApply) {
+    if (fields.text !== undefined) setContent(fields.text);
+    if (fields.tags !== undefined) setSelectedTags(fields.tags);
+
+    // mood/energy/sleep have no inputs on this page, so there is nothing for
+    // autosave to pick up — save them straight away. PUT /api/diary is a
+    // partial update, so the text and tags just set above are untouched.
+    const stateUpdate = {
+      mood: fields.mood,
+      energy: fields.energy,
+      body_condition: fields.body_condition,
+      sleep_bedtime: fields.sleep_bedtime,
+      sleep_wakeup: fields.sleep_wakeup,
+    };
+    const present = Object.fromEntries(
+      Object.entries(stateUpdate).filter(([, v]) => v !== undefined)
+    );
+    if (Object.keys(present).length === 0) return;
+
+    setSaveStatus("saving");
+    try {
+      const entry = await api.put<DiaryEntry>("/api/diary", { entry_date: date, ...present });
+      setStateFields({
+        mood: entry.mood,
+        energy: entry.energy,
+        body_condition: entry.body_condition,
+        sleep_bedtime: entry.sleep_bedtime ?? "",
+        sleep_wakeup: entry.sleep_wakeup ?? "",
+      });
+      setSaveStatus("saved");
+    } catch (err) {
+      setSaveStatus("error");
+      setError(err instanceof ApiError ? err.message : "Не удалось сохранить состояние");
+    }
+  }
+
   function toggleTag(name: string) {
     setSelectedTags((prev) => (prev.includes(name) ? prev.filter((t) => t !== name) : [...prev, name]));
   }
@@ -161,6 +216,11 @@ function DiaryContent() {
       )}
 
       <form onSubmit={onSave} className="flex flex-col gap-4">
+        <VoiceCapture
+          current={{ text: content, tags: selectedTags, ...stateFields }}
+          onApply={applyVoice}
+        />
+
         <MarkdownEditor
           value={content}
           onChange={setContent}

@@ -115,6 +115,18 @@ export type TagImpact = {
   days_with_tag: number;
 };
 
+export type VoiceTranscription = {
+  text: string | null;
+  tags: string[];
+  sleep_bedtime: string | null;
+  sleep_wakeup: string | null;
+  energy: number | null;
+  mood: number | null;
+  body_condition: number | null;
+  transcript: string;
+  used_raw_transcript: boolean;
+};
+
 export type DiaryTag = {
   id: number;
   name: string;

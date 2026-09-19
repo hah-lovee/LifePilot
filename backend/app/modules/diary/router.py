@@ -1,13 +1,23 @@
+import logging
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.deps import get_current_user
 from app.models.user import User
 from app.modules.diary.models import DiaryEntry, DiaryTag
-from app.modules.diary.schemas import DiaryEntryOut, DiaryEntryUpsert, DiaryTagCreate, DiaryTagOut
+from app.modules.diary import voice
+from app.modules.diary.schemas import (
+    DiaryEntryOut,
+    DiaryEntryUpsert,
+    DiaryTagCreate,
+    DiaryTagOut,
+    VoiceTranscriptionOut,
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/diary", tags=["diary"])
 
@@ -25,6 +35,44 @@ def list_entries(
     if date_to:
         query = query.filter(DiaryEntry.entry_date <= date_to)
     return query.order_by(DiaryEntry.entry_date.desc()).all()
+
+
+_MAX_AUDIO_BYTES = 25 * 1024 * 1024  # ~25 min of opus; well past any spoken day report
+
+
+@router.post("/voice-transcribe", response_model=VoiceTranscriptionOut)
+def voice_transcribe(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> VoiceTranscriptionOut:
+    """Recording -> diary fields, for the microphone button in the web UI.
+
+    Returns the parsed fields without saving anything: the client shows them for
+    review and the user saves through the ordinary PUT, so a misheard number
+    never lands in the diary unseen.
+    """
+    audio = file.file.read(_MAX_AUDIO_BYTES + 1)
+    if not audio:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Пустая запись")
+    if len(audio) > _MAX_AUDIO_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Запись слишком длинная",
+        )
+
+    transcript = voice.transcribe(audio, file.filename or "voice.webm", file.content_type or "audio/webm")
+    # The model picks tags from the user's own vocabulary rather than inventing
+    # them, so it has to be told what that vocabulary is.
+    allowed = [t.name for t in db.query(DiaryTag).filter(DiaryTag.user_id == user.id)]
+    parsed = voice.parse(transcript, allowed)
+    logger.info(
+        "Voice entry for user_id=%s: %d chars of speech -> text=%s mood=%s energy=%s",
+        user.id, len(transcript),
+        f"{len(parsed['text'])} chars" if parsed["text"] else "NONE",
+        parsed["mood"], parsed["energy"],
+    )
+    return VoiceTranscriptionOut(**parsed)
 
 
 # NOTE: tag routes must be declared before the "/{entry_date}" routes below,

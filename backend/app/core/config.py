@@ -33,6 +33,23 @@ class Settings(BaseSettings):
     # filters Telegram hard enough that reminders otherwise fail silently.
     telegram_proxy: str = ""
 
+    # --- Voice input: GPU services on the Windows host ---
+    # Whisper and Ollama are not in the VM. The address of the host changes
+    # whenever it reboots (Hyper-V Default Switch renumbers), so it is resolved
+    # at runtime — see app/core/hostgw.py. Setting whisper_url/ollama_url
+    # bypasses that entirely.
+    host_gw: str = ""
+    host_route_file: str = "/host/net/route"
+    whisper_url: str = ""
+    ollama_url: str = ""
+    whisper_port: int = 8100
+    ollama_port: int = 11434
+    ollama_model: str = "qwen2.5:7b"
+    # Whisper transcribes a minute of speech in seconds but queues behind other
+    # GPU work; Ollama streams nothing back until the whole JSON is ready.
+    whisper_timeout: int = 60
+    ollama_timeout: int = 30
+
     telegram_bot_token: str = ""
     telegram_bot_username: str = ""  # без "@", для ссылки-приглашения t.me/<username>
 

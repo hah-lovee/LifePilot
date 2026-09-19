@@ -26,6 +26,11 @@ services:
       - .env
     volumes:
       - uploads_data:/app/uploads
+      # Voice input reaches Whisper and Ollama on the Windows host, whose
+      # address changes on every host reboot. HOST_GW in .env is the real
+      # mechanism (see app/core/hostgw.py); this mount is the fallback, and
+      # read-only because nothing here should ever write to it.
+      - /proc/net/route:/host/net/route:ro
     depends_on:
       postgres:
         condition: service_healthy
