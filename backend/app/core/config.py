@@ -28,11 +28,6 @@ class Settings(BaseSettings):
     # bot, and browser voice input authenticates with the ordinary user JWT.
     integration_api_key: str = ""
 
-    # When set (e.g. http://172.24.160.1:8889), habit reminders tunnel to
-    # Telegram through tools/telegram-proxy.py on the dev PC. This network
-    # filters Telegram hard enough that reminders otherwise fail silently.
-    telegram_proxy: str = ""
-
     # --- Voice input: GPU services on the Windows host ---
     # Whisper and Ollama are not in the VM. The address of the host changes
     # whenever it reboots (Hyper-V Default Switch renumbers), so it is resolved

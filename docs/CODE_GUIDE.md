@@ -20,8 +20,7 @@
 │   caddy :80/:443 ──┬──► frontend :3000  (Next.js)        │           │
 │                    └──► backend  :8000  (FastAPI) ───────┘           │
 │                              │                                       │
-│                              ├──► postgres :5432                     │
-│                              └──► vpn-proxy :8889 ──► Telegram API   │
+│                              └──► postgres :5432                     │
 └──────────────────────────────────────────────────────────────────────┘
                                        ▲
                             CloudPub → https://lifepilot.cloudpub.ru
@@ -223,7 +222,6 @@ catch (err) {
 | `Caddyfile` | `/api/*` и `/uploads/*` → backend, остальное → frontend |
 | `.env` | Реальные значения (в `.gitignore`) |
 | `.env.example` | Шаблон с пояснениями |
-| `xray-config.json` | Конфиг VPN, содержит ключи подписки (в `.gitignore`) |
 
 ### Переменные окружения
 
@@ -237,7 +235,6 @@ catch (err) {
 | `INVESTMENTS_API_URL/KEY` | Доступ к trading-keys-api по внутренней docker-сети |
 | `TELEGRAM_BOT_TOKEN` | Напоминания и привязка аккаунтов |
 | `TELEGRAM_BOT_USERNAME` | Для ссылки `t.me/<username>?start=<код>` |
-| `TELEGRAM_PROXY` | Прокси к Telegram API. Пусто — идём напрямую |
 | `INTEGRATION_API_KEY` | Зарезервировано, сейчас не читается никем |
 | `HOST_GW` | Адрес Windows-хоста. **Главный механизм**, см. раздел 5 |
 | `HOST_ROUTE_FILE` | Где искать route-таблицу, если `HOST_GW` пуст. По умолчанию `/host/net/route` |
@@ -346,7 +343,7 @@ git-ref, backend отдаёт его в `GET /api/health`. Без этой пр�
 |---|---|---|
 | **Docker Hub, ghcr.io** | `EOF` при `docker pull` | Сборка на ПК → `docker save`/`load` |
 | **GitHub** | `git pull` и `git clone` висят | Перенос архива через `scp` |
-| **Telegram API** | TCP встаёт за 0.0 с, запрос висит до таймаута | `TELEGRAM_PROXY`, откат на прямое соединение |
+| **Telegram API** | TCP встаёт за 0.0 с, запрос висит до таймаута | Перебор адресов в `telegram/client.py`; напоминания доходят не всегда |
 | **IPv6** | `Network is unreachable` сразу | Форсировать IPv4 |
 
 **IPv6 — главная ловушка.** Маршрут анонсирован, но пакеты не доставляются.

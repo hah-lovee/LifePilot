@@ -114,32 +114,13 @@ def _invalidate() -> None:
 
 
 def _probing_getaddrinfo(host, *args, **kwargs):
-    # With a proxy configured the hostname is resolved at the proxy's end, so
-    # rewriting it here would be both pointless and wrong.
-    if host == _TELEGRAM_HOST and not settings.telegram_proxy:
+    if host == _TELEGRAM_HOST:
         host = _resolve()
     return _original_getaddrinfo(host, *args, **kwargs)
 
 
 socket.getaddrinfo = _probing_getaddrinfo
 
-
-def _proxies() -> dict | None:
-    if not settings.telegram_proxy:
-        return None
-    return {"http": settings.telegram_proxy, "https": settings.telegram_proxy}
-
-
-def _post_send(chat_id: str, text: str, proxies: dict | None) -> bool:
-    resp = requests.post(
-        _api_url("sendMessage"),
-        json={"chat_id": chat_id, "text": text},
-        timeout=_REQUEST_TIMEOUT,
-        proxies=proxies,
-    )
-    if not resp.ok:
-        logger.warning("Telegram sendMessage failed for chat_id=%s: %s", chat_id, resp.text)
-    return resp.ok
 
 
 def _api_url(method: str) -> str:
@@ -156,20 +137,12 @@ _REQUEST_TIMEOUT = 60
 def send_message(chat_id: str, text: str) -> None:
     if not settings.telegram_bot_token:
         return
-
-    proxies = _proxies()
-    if proxies:
-        # The proxy sits on a PC whose VPN is not always up, and without it the
-        # proxy reaches Telegram no better than we would. So try it, but treat
-        # it as an optimisation rather than the only route.
-        try:
-            if _post_send(chat_id, text, proxies):
-                return
-        except requests.exceptions.RequestException as exc:
-            logger.warning("Telegram via proxy failed (%s); trying direct", exc)
-
     try:
-        _post_send(chat_id, text, None)
+        resp = requests.post(
+            _api_url("sendMessage"), json={"chat_id": chat_id, "text": text}, timeout=_REQUEST_TIMEOUT
+        )
+        if not resp.ok:
+            logger.warning("Telegram sendMessage failed for chat_id=%s: %s", chat_id, resp.text)
     except requests.exceptions.RequestException:
         logger.exception("Telegram sendMessage request failed for chat_id=%s", chat_id)
         # Most likely the chosen address stopped answering; the next reminder
@@ -184,11 +157,8 @@ def get_updates(offset: int | None, timeout: int = 0) -> list[dict]:
     params: dict = {"timeout": timeout}
     if offset is not None:
         params["offset"] = offset
-    proxies = _proxies()
     try:
-        resp = requests.get(
-            _api_url("getUpdates"), params=params, timeout=timeout + _REQUEST_TIMEOUT, proxies=proxies
-        )
+        resp = requests.get(_api_url("getUpdates"), params=params, timeout=timeout + _REQUEST_TIMEOUT)
         resp.raise_for_status()
         return resp.json().get("result", [])
     except requests.exceptions.RequestException:
