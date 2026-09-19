@@ -11,7 +11,6 @@ from app.modules.admin.router import router as admin_router
 from app.modules.auth.router import router as auth_router
 from app.modules.diary.router import router as diary_router
 from app.modules.habits.router import router as habits_router
-from app.modules.integrations.router import router as integrations_router
 from app.modules.investments.router import router as investments_router
 from app.modules.investments.scheduler import start_scheduler as start_investments_scheduler
 from app.modules.investments.scheduler import stop_scheduler as stop_investments_scheduler
@@ -52,7 +51,6 @@ app.include_router(sport_router)
 app.include_router(admin_router)
 app.include_router(investments_router)
 app.include_router(telegram_router)
-app.include_router(integrations_router)
 
 
 def _build_ref() -> str:

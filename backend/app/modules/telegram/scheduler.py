@@ -8,6 +8,7 @@ from app.core.db import SessionLocal
 from app.models.user import User
 from app.modules.habits.models import Habit, HabitLog
 from app.modules.telegram import client
+from app.modules.telegram.poller import poll_updates
 
 logger = logging.getLogger(__name__)
 
@@ -65,17 +66,23 @@ def run_reminder_check_job() -> None:
 
 
 def start_scheduler() -> None:
-    # Outbound reminders only. This process must never call getUpdates:
-    # Telegram hands each update to exactly one getUpdates consumer, and that
-    # consumer is the voice-bot container, which forwards "/start <code>"
-    # back to us via POST /api/integrations/telegram/link. sendMessage has no
-    # such exclusivity, so reminders can keep going out from here.
+    # This process is the only getUpdates consumer again: the voice-bot that
+    # briefly held that role is gone (Telegram's API is unreachable from this
+    # network, so voice input moved into the web UI instead). Telegram hands
+    # each update to exactly one caller, so nothing else may poll this token.
     _scheduler.add_job(
         run_reminder_check_job,
         trigger="cron",
         minute="*",
         second=0,
         id="telegram_habit_reminders",
+        replace_existing=True,
+    )
+    _scheduler.add_job(
+        poll_updates,
+        trigger="interval",
+        seconds=15,
+        id="telegram_poll_updates",
         replace_existing=True,
     )
     _scheduler.start()

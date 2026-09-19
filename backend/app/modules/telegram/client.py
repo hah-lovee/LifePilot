@@ -175,3 +175,24 @@ def send_message(chat_id: str, text: str) -> None:
         # Most likely the chosen address stopped answering; the next reminder
         # then re-probes instead of retrying a dead IP forever.
         _invalidate()
+
+
+def get_updates(offset: int | None, timeout: int = 0) -> list[dict]:
+    """Long-poll-friendly getUpdates. offset = last processed update_id + 1."""
+    if not settings.telegram_bot_token:
+        return []
+    params: dict = {"timeout": timeout}
+    if offset is not None:
+        params["offset"] = offset
+    proxies = _proxies()
+    try:
+        resp = requests.get(
+            _api_url("getUpdates"), params=params, timeout=timeout + _REQUEST_TIMEOUT, proxies=proxies
+        )
+        resp.raise_for_status()
+        return resp.json().get("result", [])
+    except requests.exceptions.RequestException:
+        logger.exception("Telegram getUpdates request failed")
+        # The chosen address may have gone dark; re-probe before the next poll.
+        _invalidate()
+        return []

@@ -23,8 +23,9 @@ class Settings(BaseSettings):
     investments_api_url: str = "http://localhost:8001"
     investments_api_key: str = ""
 
-    # Shared secret for /api/integrations/* (voice-bot). Empty = integration
-    # API disabled, which is the right default for anyone not running the bot.
+    # Reserved for a future machine-to-machine caller. Nothing reads it today:
+    # the /api/integrations/* endpoints it guarded went away with the Telegram
+    # bot, and browser voice input authenticates with the ordinary user JWT.
     integration_api_key: str = ""
 
     # When set (e.g. http://172.24.160.1:8889), habit reminders tunnel to
