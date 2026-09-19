@@ -106,10 +106,40 @@ async def handle_fillers(message: Message) -> None:
     await message.answer("Считаю такие слова:\n" + ", ".join(fillers.FILLER_WORDS))
 
 
-async def _run(message: Message, *, text: str | None = None, audio: bytes | None = None) -> None:
+async def _download(bot: Bot, payload) -> bytes:
+    """Fetch the voice note, re-probing once if Telegram drops mid-download.
+
+    getFile and the file download go over the same throttled, intermittently
+    filtered link as everything else, and the address that was answering when
+    polling started can stop answering by the time a voice note arrives. One
+    retry after invalidating costs a probe; without it the report is simply
+    lost.
+    """
+    for attempt in (1, 2):
+        buffer = BytesIO()
+        try:
+            await bot.download(payload, destination=buffer)
+            return buffer.getvalue()
+        except TelegramNetworkError:
+            if attempt == 2:
+                raise
+            logger.warning("Voice download failed; re-probing Telegram and retrying once")
+            telegram_net.invalidate()
+    raise AssertionError("unreachable")
+
+
+async def _run(message: Message, *, text: str | None = None, payload=None, bot: Bot | None = None) -> None:
     status = await message.answer("⏳ Обрабатываю…")
     try:
+        # Downloading inside the guarded block on purpose: it used to sit in the
+        # handler, so a timeout here escaped the handler entirely and the sender
+        # got no reply at all — just a traceback in the log.
+        audio = await _download(bot, payload) if payload is not None else None
         reply = await pipeline.handle_report(str(message.chat.id), text=text, audio=audio)
+    except TelegramNetworkError as exc:
+        telegram_net.invalidate()
+        logger.warning("Telegram network error while handling a report: %s", exc)
+        reply = "⚠️ Связь с Telegram оборвалась на полпути. Пришли ещё раз — адрес переподобран."
     except Exception as exc:  # noqa: BLE001 — surfaced to the user verbatim
         logger.exception("Report processing failed")
         reply = f"⚠️ Не получилось: {exc}"
@@ -127,11 +157,7 @@ async def handle_voice(message: Message, bot: Bot) -> None:
     if _is_stale(message):
         logger.warning("Skipping stale voice message from %s", message.date)
         return
-
-    payload = message.voice or message.audio
-    buffer = BytesIO()
-    await bot.download(payload, destination=buffer)
-    await _run(message, audio=buffer.getvalue())
+    await _run(message, payload=message.voice or message.audio, bot=bot)
 
 
 @dp.message(F.text)
