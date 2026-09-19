@@ -39,22 +39,39 @@ def _parse_default_gateway(route_table: str) -> str | None:
     return None
 
 
+def _read_gateway(path: str) -> str | None:
+    try:
+        with open(path, encoding="ascii") as fh:
+            return _parse_default_gateway(fh.read())
+    except OSError:
+        return None
+
+
 def _discover() -> str:
     if config.HOST_GW:
         return config.HOST_GW
 
-    try:
-        with open(config.HOST_ROUTE_FILE, encoding="ascii") as fh:
-            gateway = _parse_default_gateway(fh.read())
-    except OSError as exc:
-        raise RuntimeError(
-            f"Cannot read {config.HOST_ROUTE_FILE}: {exc}. Either mount the VM's "
-            "/proc/net/route into the container (see infra/docker-compose.yml) "
-            "or set HOST_GW explicitly."
-        ) from exc
-
+    gateway = _read_gateway(config.HOST_ROUTE_FILE)
     if not gateway:
-        raise RuntimeError(f"No default route found in {config.HOST_ROUTE_FILE}")
+        raise RuntimeError(
+            f"No default route in {config.HOST_ROUTE_FILE}. Set HOST_GW to the VM's "
+            "default gateway — on the VM: ip route | awk '/default/{print $3}'"
+        )
+
+    # Bind-mounting the VM's /proc/net/route does NOT expose the VM's routes:
+    # /proc/net is a symlink to /proc/self/net, so inside the container it
+    # re-resolves to this container's own network namespace and reports the
+    # docker bridge — which is the VM itself, never the Hyper-V host. Catch that
+    # rather than silently pointing Whisper and Ollama at the wrong machine.
+    own_gateway = _read_gateway("/proc/net/route")
+    if gateway == own_gateway:
+        raise RuntimeError(
+            f"Route lookup returned {gateway}, which is this container's own gateway "
+            "(the docker bridge = the VM), not the Windows host. Set HOST_GW in "
+            "infra/.env — on the VM: ip route | awk '/default/{print $3}'. To survive "
+            "host reboots renumbering the Hyper-V switch, run voice-bot/refresh-host-gw.sh "
+            "from cron; see voice-bot/README.md."
+        )
     return gateway
 
 
