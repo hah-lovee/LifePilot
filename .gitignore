@@ -39,3 +39,6 @@ backups/
 trading-keys-api/
 
 voice-bot-spec.md
+# Docker image exports land here by habit; ignore them wherever they appear so
+# a stray `docker save` in the repo root can't be swept into a commit.
+*.tar
