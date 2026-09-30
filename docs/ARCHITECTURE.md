@@ -55,7 +55,14 @@ docker compose exec backend alembic upgrade head   # миграции приме
 - `exercise_logs(id, exercise_id, log_date, weight, reps, sets, note)` — без уникальности по дате: за один день можно записать несколько подходов.
 - `POST /api/exercises/{id}/adopt` — копирует каталожное упражнение в личный список пользователя.
 
-Прогресс считается на фронтенде из логов: максимальный вес по датам (график) + таблица последних подходов (`/sport/progress`).
+Фото упражнений лежат в таблице `exercise_photos` (bytea), а не на volume: развёртывание на VM переносит
+`pg_dump` и `docker save`, и volume не едет ни с тем, ни с другим. Отдаются публичным
+`GET /api/exercises/{id}/photo?v=<хэш>` — `<img>` не умеет слать Bearer-токен.
+
+Прогресс по отдельному упражнению — страница `/sport/exercise/{id}` (график максимального веса, рекорд,
+оценка 1ПМ, вся история подходов), считается на фронтенде из логов. Сводный отчёт `/sport/reports` —
+`GET /api/reports/sport`, считается на бэкенде (`backend/app/modules/reports/sport.py`): готовность групп
+мышц, нагрузка за 30 дней, объём по неделям, прогресс всех упражнений.
 
 ## Модуль 2.1 — Админка (реализован)
 
@@ -63,7 +70,7 @@ docker compose exec backend alembic upgrade head   # миграции приме
 
 - Управление списком пользователей и флагом `is_admin` (первый зарегистрированный пользователь становится администратором автоматически).
 - Мутабельный инвайт-код — хранится в таблице `app_settings` (key/value), переопределяет `REGISTRATION_CODE` из `.env` без перезапуска backend.
-- Создание/удаление каталожных привычек (`habits.is_base=True`) и упражнений (`exercises.is_base=True`, с загрузкой фото через `UploadFile` → `backend/uploads`, отдаются статикой по `/uploads`).
+- Создание/удаление каталожных привычек (`habits.is_base=True`) и упражнений (`exercises.is_base=True`, с загрузкой фото через `UploadFile` → таблица `exercise_photos`; Pillow пережимает в WebP 1024 px).
 
 Привычки используют тот же паттерн "каталог": `habits.user_id` нулевой и `is_base=True` для записей администратора, `POST /api/habits/{id}/adopt` копирует привычку в личный список.
 

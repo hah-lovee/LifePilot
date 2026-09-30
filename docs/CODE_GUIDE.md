@@ -52,7 +52,7 @@ backend/app/
 │   ├── deps.py          get_current_user, require_admin
 │   ├── security.py      bcrypt, выпуск и разбор JWT
 │   ├── hostgw.py        поиск адреса Windows-хоста
-│   └── uploads.py       приём файлов в backend/uploads
+│   └── uploads.py       приём фото упражнений: Pillow → WebP → таблица exercise_photos
 ├── models/user.py       User — единственная модель вне модулей
 └── modules/<имя>/       по модулю на предметную область
 ```
@@ -147,7 +147,7 @@ frontend/src/
 │   ├── layout.tsx        общий каркас
 │   ├── globals.css       Tailwind + CSS-переменные темы
 │   ├── diary/            запись, состояние, привычки, теги, календарь, отчёты
-│   ├── sport/            упражнения, прогресс, каталог, календарь
+│   ├── sport/            тренировка дня, каталог, календарь, отчёты, exercise/[id]
 │   ├── investments/      портфель, диверсификация, дивиденды, активы
 │   ├── admin/            пользователи и каталоги
 │   └── login, register, settings
@@ -219,7 +219,7 @@ catch (err) {
 | Файл | Назначение |
 |---|---|
 | `docker-compose.yml` | Все сервисы |
-| `Caddyfile` | `/api/*` и `/uploads/*` → backend, остальное → frontend |
+| `Caddyfile` | `/api/*` → backend, остальное → frontend (`/uploads/*` больше не используется) |
 | `.env` | Реальные значения (в `.gitignore`) |
 | `.env.example` | Шаблон с пояснениями |
 

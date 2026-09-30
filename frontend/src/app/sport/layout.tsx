@@ -9,7 +9,7 @@ const subLinks = [
   { href: "/sport", label: "Тренировка дня", datePerDay: true },
   { href: "/sport/catalog", label: "Каталог", datePerDay: true },
   { href: "/sport/calendar", label: "Календарь", datePerDay: false },
-  { href: "/sport/progress", label: "Прогресс", datePerDay: false },
+  { href: "/sport/reports", label: "Отчёты", datePerDay: false },
 ];
 
 export default function SportLayout({ children }: { children: ReactNode }) {

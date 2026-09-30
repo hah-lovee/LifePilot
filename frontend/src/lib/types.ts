@@ -299,3 +299,60 @@ export type AssetDetail = {
   annual_income_rub: number;
   yield_on_cost_pct: number;
 };
+
+export type MuscleReadiness = {
+  group: string;
+  last_trained: string;
+  days_since: number;
+  base_recovery_hours: number;
+  recovery_hours: number;
+  sets_last_session: number;
+  typical_sets: number;
+  readiness_pct: number;
+  ready_in_days: number;
+};
+
+export type GroupLoad = {
+  group: string;
+  sessions: number;
+  sets: number;
+  volume: number;
+  share_pct: number;
+};
+
+export type WeeklyLoad = {
+  week_start: string;
+  sets: number;
+  volume: number;
+  sessions: number;
+};
+
+export type ExerciseProgress = {
+  exercise_id: number;
+  name: string;
+  muscle_group: string | null;
+  best_weight: number | null;
+  best_weight_date: string | null;
+  recent_best: number | null;
+  previous_best: number | null;
+  delta: number | null;
+  last_done: string;
+  sessions: number;
+  sets: number;
+  stale: boolean;
+};
+
+export type SportFrequency = {
+  sessions_30d: number;
+  sessions_per_week: number;
+  longest_gap_days: number | null;
+  days_since_last: number | null;
+};
+
+export type SportReport = {
+  readiness: MuscleReadiness[];
+  load_30d: GroupLoad[];
+  weekly: WeeklyLoad[];
+  exercises: ExerciseProgress[];
+  frequency: SportFrequency;
+};

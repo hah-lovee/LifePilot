@@ -60,3 +60,60 @@ class SleepSummary(BaseModel):
     days_with_data: int
     score_by_quality: dict[str, float | None]  # {"отличный": 8.2, ...}
     points: list[SleepPoint]
+
+
+class MuscleReadiness(BaseModel):
+    group: str
+    last_trained: date
+    days_since: int
+    base_recovery_hours: int  # as configured for the group
+    recovery_hours: int  # after adjusting for how hard the last session was
+    sets_last_session: int
+    typical_sets: float
+    readiness_pct: int
+    ready_in_days: int
+
+
+class GroupLoad(BaseModel):
+    group: str
+    sessions: int
+    sets: int
+    volume: float
+    share_pct: float
+
+
+class WeeklyLoad(BaseModel):
+    week_start: date
+    sets: int
+    volume: float
+    sessions: int
+
+
+class ExerciseProgress(BaseModel):
+    exercise_id: int
+    name: str
+    muscle_group: str | None
+    best_weight: float | None
+    best_weight_date: date | None
+    recent_best: float | None  # best of the last 8 weeks
+    previous_best: float | None  # best of the 8 weeks before those
+    delta: float | None
+    last_done: date
+    sessions: int
+    sets: int
+    stale: bool
+
+
+class SportFrequency(BaseModel):
+    sessions_30d: int
+    sessions_per_week: float
+    longest_gap_days: int | None
+    days_since_last: int | None
+
+
+class SportReport(BaseModel):
+    readiness: list[MuscleReadiness]
+    load_30d: list[GroupLoad]
+    weekly: list[WeeklyLoad]
+    exercises: list[ExerciseProgress]
+    frequency: SportFrequency

@@ -1,5 +1,6 @@
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
@@ -17,11 +18,27 @@ from app.modules.reports.schemas import (
     ReportSummary,
     SleepPoint,
     SleepSummary,
+    SportReport,
     StateSummary,
     TagImpact,
 )
+from app.modules.reports.sport import build_report
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
+
+
+@router.get("/sport", response_model=SportReport)
+def sport_report(
+    db: Session = Depends(get_db), user: User = Depends(get_current_user)
+) -> SportReport:
+    # Workouts are recorded by date, so "today" has to be the user's own today —
+    # on a UTC server a late-evening session in Moscow would otherwise be read
+    # as having happened tomorrow.
+    try:
+        local_now = datetime.now(timezone.utc).astimezone(ZoneInfo(user.timezone))
+    except (KeyError, ValueError):  # an unknown timezone must not break the report
+        local_now = datetime.now(timezone.utc)
+    return build_report(db, user, local_now.date())
 
 
 @router.get("/day-scores", response_model=list[DayScorePoint])
