@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { API_URL, api, ApiError } from "@/lib/api";
 import { DateNav } from "@/components/date-nav";
@@ -128,7 +129,12 @@ function SportCatalogContent() {
                 </div>
               )}
               <div className="min-w-[140px] flex-1">
-                <p className="font-medium text-[var(--color-ink)]">{ex.name}</p>
+                <Link
+                  href={`/sport/exercise/${ex.id}?date=${date}`}
+                  className="font-medium text-[var(--color-ink)] underline decoration-[#cdd7dd] decoration-1 underline-offset-[3px] hover:decoration-[var(--color-accent)]"
+                >
+                  {ex.name}
+                </Link>
                 {ex.muscle_group && <p className="text-[11.5px] text-[var(--color-faint)]">{ex.muscle_group}</p>}
               </div>
               <button

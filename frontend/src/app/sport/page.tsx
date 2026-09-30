@@ -191,6 +191,7 @@ function SportContent() {
                   key={exerciseId}
                   id={exerciseId}
                   index={index + 1}
+                  date={date}
                   exercise={exerciseById.get(exerciseId)}
                   logs={exerciseLogs}
                   previousBest={previousBest.get(exerciseId)}
@@ -210,6 +211,7 @@ function SportContent() {
 function SortableExerciseItem({
   id,
   index,
+  date,
   exercise,
   logs,
   previousBest,
@@ -219,6 +221,7 @@ function SortableExerciseItem({
 }: {
   id: number;
   index: number;
+  date: string;
   exercise: Exercise | undefined;
   logs: ExerciseLog[];
   previousBest?: ExerciseLog;
@@ -242,6 +245,7 @@ function SortableExerciseItem({
         exercise={exercise}
         logs={logs}
         index={index}
+        date={date}
         previousBest={previousBest}
         dragHandleProps={{ ...attributes, ...listeners }}
         onAddSet={onAddSet}
@@ -256,6 +260,7 @@ function ExerciseGroup({
   exercise,
   logs,
   index,
+  date,
   previousBest,
   dragHandleProps,
   onAddSet,
@@ -265,6 +270,7 @@ function ExerciseGroup({
   exercise: Exercise | undefined;
   logs: ExerciseLog[];
   index: number;
+  date: string;
   previousBest?: ExerciseLog;
   dragHandleProps?: React.HTMLAttributes<HTMLElement>;
   onAddSet: () => void;
@@ -295,7 +301,16 @@ function ExerciseGroup({
           </div>
         )}
         <div className="min-w-[120px] flex-1">
-          <p className="font-semibold text-[var(--color-ink)]">{exercise?.name ?? "Упражнение удалено"}</p>
+          {exercise ? (
+            <Link
+              href={`/sport/exercise/${exercise.id}?date=${date}`}
+              className="font-semibold text-[var(--color-ink)] underline decoration-[#cdd7dd] decoration-1 underline-offset-[3px] hover:decoration-[var(--color-accent)]"
+            >
+              {exercise.name}
+            </Link>
+          ) : (
+            <p className="font-semibold text-[var(--color-ink)]">Упражнение удалено</p>
+          )}
           {exercise?.muscle_group && (
             <p className="text-[11.5px] text-[var(--color-faint)]">{exercise.muscle_group}</p>
           )}
