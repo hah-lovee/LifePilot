@@ -1,10 +1,8 @@
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.modules.admin.router import router as admin_router
@@ -40,8 +38,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-os.makedirs(settings.upload_dir, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
+# There is no /uploads mount any more: exercise photos are rows in the database
+# and are served by GET /api/exercises/{id}/photo. settings.upload_dir survives
+# only as the import source for migration 0013.
 
 app.include_router(auth_router)
 app.include_router(habits_router)

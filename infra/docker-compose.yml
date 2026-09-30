@@ -25,6 +25,9 @@ services:
     env_file:
       - .env
     volumes:
+      # Exercise photos are database rows now — this volume is only where
+      # migration 0013 looks for the old files to import. It can be removed
+      # (here and from the volumes: block) once that migration has run.
       - uploads_data:/app/uploads
       # Voice input reaches Whisper and Ollama on the Windows host, whose
       # address changes on every host reboot. HOST_GW in .env is the real

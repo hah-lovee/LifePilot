@@ -34,6 +34,7 @@ export type UserAdmin = {
 export type MuscleGroup = {
   id: number;
   name: string;
+  recovery_hours: number;
 };
 
 export type Exercise = {

@@ -3,12 +3,13 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.deps import require_admin
-from app.core.uploads import delete_exercise_photo, save_exercise_photo
+from app.core.uploads import store_exercise_photo
 from app.models.user import User
 from app.modules.admin.schemas import (
     CatalogHabitCreate,
     ExerciseAdminUpdate,
     MuscleGroupCreate,
+    MuscleGroupUpdate,
     RegistrationCodeOut,
     RegistrationCodeUpdate,
     UserAdminOut,
@@ -22,18 +23,6 @@ from app.modules.sport.models import Exercise, MuscleGroup
 from app.modules.sport.schemas import ExerciseOut, MuscleGroupOut
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_admin)])
-
-
-def _delete_photo_if_unused(db: Session, photo_url: str | None) -> None:
-    """Only remove the file from disk if no other exercise row still points at
-    it — old data from a since-removed "copy exercise" feature could leave
-    several rows sharing one photo_url, and deleting it out from under them
-    broke their photo too."""
-    if not photo_url:
-        return
-    if db.query(Exercise).filter(Exercise.photo_url == photo_url).first() is not None:
-        return
-    delete_exercise_photo(photo_url)
 
 
 @router.get("/users", response_model=list[UserAdminOut])
@@ -88,8 +77,21 @@ def create_muscle_group(payload: MuscleGroupCreate, db: Session = Depends(get_db
     existing = db.query(MuscleGroup).filter(MuscleGroup.name == name).first()
     if existing is not None:
         return existing
-    group = MuscleGroup(name=name)
+    group = MuscleGroup(name=name, recovery_hours=payload.recovery_hours)
     db.add(group)
+    db.commit()
+    db.refresh(group)
+    return group
+
+
+@router.patch("/muscle-groups/{group_id}", response_model=MuscleGroupOut)
+def update_muscle_group(
+    group_id: int, payload: MuscleGroupUpdate, db: Session = Depends(get_db)
+) -> MuscleGroup:
+    group = db.query(MuscleGroup).filter(MuscleGroup.id == group_id).first()
+    if group is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Muscle group not found")
+    group.recovery_hours = payload.recovery_hours
     db.commit()
     db.refresh(group)
     return group
@@ -103,11 +105,12 @@ async def create_catalog_exercise(
     photo: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ) -> Exercise:
-    photo_url = await save_exercise_photo(photo) if photo and photo.filename else None
-    exercise = Exercise(
-        name=name, description=description, muscle_group_id=muscle_group_id, photo_url=photo_url
-    )
+    exercise = Exercise(name=name, description=description, muscle_group_id=muscle_group_id)
     db.add(exercise)
+    if photo and photo.filename:
+        # The photo row is keyed by exercise id, so the id has to exist first.
+        db.flush()
+        await store_exercise_photo(db, exercise, photo)
     db.commit()
     db.refresh(exercise)
     return exercise
@@ -134,12 +137,9 @@ async def replace_exercise_photo(
     exercise = db.query(Exercise).filter(Exercise.id == exercise_id).first()
     if exercise is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exercise not found")
-    old_photo_url = exercise.photo_url
-    exercise.photo_url = await save_exercise_photo(photo)
+    await store_exercise_photo(db, exercise, photo)
     db.commit()
     db.refresh(exercise)
-    if old_photo_url and old_photo_url != exercise.photo_url:
-        _delete_photo_if_unused(db, old_photo_url)
     return exercise
 
 
@@ -157,7 +157,6 @@ def delete_catalog_exercise(exercise_id: int, db: Session = Depends(get_db)) -> 
     exercise = db.query(Exercise).filter(Exercise.id == exercise_id).first()
     if exercise is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Catalog exercise not found")
-    photo_url = exercise.photo_url
+    # exercise_photos.exercise_id is ON DELETE CASCADE, so the photo goes with it.
     db.delete(exercise)
     db.commit()
-    _delete_photo_if_unused(db, photo_url)

@@ -89,6 +89,16 @@ export default function AdminCatalogPage() {
     }
   }
 
+  async function setRecoveryHours(groupId: number, hours: number) {
+    setError(null);
+    try {
+      await api.patch(`/api/admin/muscle-groups/${groupId}`, { recovery_hours: hours });
+      await loadCatalog();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Не удалось изменить время восстановления");
+    }
+  }
+
   async function createExercise(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -232,11 +242,29 @@ export default function AdminCatalogPage() {
             Добавить группу
           </button>
         </form>
-        <div className="flex flex-wrap gap-2">
+        <p className="mb-3 text-[12.5px] text-[var(--color-faint)]">
+          Время восстановления используется в отчёте «Готовность групп мышц»: столько часов группа считается
+          неотдохнувшей после тренировки. Ориентиры — 72 ч для крупных групп (спина, грудь, ноги), 48 ч для рук и
+          плеч, 24 ч для пресса и икр.
+        </p>
+        <div className="flex flex-col gap-1.5">
           {muscleGroups.map((g) => (
-            <span key={g.id} className="tag-chip">
-              {g.name}
-            </span>
+            <div key={g.id} className="flex flex-wrap items-center gap-2.5 rounded-md bg-[#fbfbfa] px-2.5 py-1.5">
+              <span className="min-w-[120px] flex-1 text-[13px] text-[var(--color-ink)]">{g.name}</span>
+              <input
+                type="number"
+                min={8}
+                max={336}
+                step={12}
+                defaultValue={g.recovery_hours}
+                onBlur={(e) => {
+                  const hours = Number(e.target.value);
+                  if (hours !== g.recovery_hours && hours >= 8 && hours <= 336) setRecoveryHours(g.id, hours);
+                }}
+                className="input-field w-[88px] py-1 text-[13px]"
+              />
+              <span className="text-[12px] text-[var(--color-faint)]">ч восстановления</span>
+            </div>
           ))}
           {muscleGroups.length === 0 && <p className="text-[var(--color-faint)]">Группы мышц пока не заведены.</p>}
         </div>
@@ -245,8 +273,8 @@ export default function AdminCatalogPage() {
       <section className="metric-card">
         <h2 className="mb-1 text-sm font-semibold text-[var(--color-ink)]">Упражнения каталога</h2>
         <p className="mb-3.5 text-[12.5px] text-[var(--color-faint)]">
-          Рекомендуемое фото: квадратное, ~800×800 px, JPEG/WebP, до 1 МБ (жёсткое ограничение — 3 МБ). Этого
-          достаточно для чёткого отображения и в карточке, и при увеличении.
+          Фото можно грузить любое до 10 МБ — оно сохраняется в базу, уменьшается до 1024 px по длинной стороне и
+          пережимается в WebP (≈100 КБ). Анимированные GIF остаются как есть. Лучше всего смотрится квадратное.
         </p>
         <form onSubmit={createExercise} className="mb-4 flex flex-wrap items-center gap-2.5">
           <input

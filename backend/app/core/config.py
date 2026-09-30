@@ -18,6 +18,10 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = ["http://localhost:3000"]
 
+    # Legacy: exercise photos used to be files here, on a Docker volume that
+    # did not survive a move to the VM. They are database rows now, and this
+    # path is read once, by migration 0013, to import whatever is still on
+    # the volume. Safe to drop once that migration has run everywhere.
     upload_dir: str = "./uploads"
 
     investments_api_url: str = "http://localhost:8001"

@@ -1,12 +1,12 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.deps import get_current_user
 from app.models.user import User
-from app.modules.sport.models import Exercise, ExerciseLog
+from app.modules.sport.models import Exercise, ExerciseLog, ExercisePhoto
 from app.modules.sport.schemas import ExerciseLogCreate, ExerciseLogOut, ExerciseLogUpdate, ExerciseOut
 
 router = APIRouter(tags=["sport"])
@@ -22,6 +22,40 @@ def _get_owned_log(db: Session, user: User, log_id: int) -> ExerciseLog:
 @router.get("/api/exercises", response_model=list[ExerciseOut])
 def list_exercises(db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> list[Exercise]:
     return db.query(Exercise).order_by(Exercise.name).all()
+
+
+@router.get("/api/exercises/{exercise_id}/photo")
+def get_exercise_photo(exercise_id: int, v: str | None = None, db: Session = Depends(get_db)) -> Response:
+    """Serves the photo bytes stored in the database.
+
+    Deliberately the one endpoint without get_current_user: an <img> tag cannot
+    send the bearer token, and the catalog is shared pictures of gym equipment,
+    not personal data. Nothing about a user is reachable through it."""
+    photo = db.get(ExercisePhoto, exercise_id)
+    if photo is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found")
+    # A request carrying the right digest can be cached forever, because a
+    # replaced photo gets a new digest and therefore a new URL. A bare request
+    # (an old link, a hand-typed one) has to revalidate instead.
+    fresh = v is not None and photo.sha256.startswith(v)
+    return Response(
+        content=photo.content,
+        media_type=photo.content_type,
+        headers={
+            "Cache-Control": "public, max-age=31536000, immutable" if fresh else "no-cache",
+            "ETag": f'"{photo.sha256}"',
+        },
+    )
+
+
+@router.get("/api/exercises/{exercise_id}", response_model=ExerciseOut)
+def get_exercise(
+    exercise_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+) -> Exercise:
+    exercise = db.query(Exercise).filter(Exercise.id == exercise_id).first()
+    if exercise is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exercise not found")
+    return exercise
 
 
 @router.get("/api/exercise-logs", response_model=list[ExerciseLogOut])

@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class MuscleGroupOut(BaseModel):
     id: int
     name: str
+    recovery_hours: int
 
     model_config = {"from_attributes": True}
 
