@@ -356,3 +356,140 @@ export type SportReport = {
   exercises: ExerciseProgress[];
   frequency: SportFrequency;
 };
+
+// --- Финансы: бюджет месяца -------------------------------------------------
+
+export type MonthItem = {
+  item_id: number;
+  name: string;
+  planned: number | null;
+  actual: number;
+  /** План минус факт для расходов и факт минус план для доходов — плюс всегда «хорошо». */
+  difference: number | null;
+  percent_of_income: number | null;
+  transactions: number;
+  in_plan: boolean;
+};
+
+export type MonthGroup = {
+  group_id: number;
+  name: string;
+  kind: "income" | "expense";
+  counts_as_savings: boolean;
+  items: MonthItem[];
+  planned: number;
+  actual: number;
+  difference: number;
+};
+
+export type MonthView = {
+  month: string;
+  income: MonthGroup[];
+  expenses: MonthGroup[];
+  planned_income: number;
+  actual_income: number;
+  planned_expenses: number;
+  actual_expenses: number;
+  planned_balance: number;
+  actual_balance: number;
+  balance_difference: number;
+  is_empty: boolean;
+  previous_month: string | null;
+};
+
+export type FinanceItem = {
+  id: number;
+  group_id: number;
+  name: string;
+  sort_order: number;
+  archived: boolean;
+};
+
+export type FinanceGroup = {
+  id: number;
+  name: string;
+  kind: "income" | "expense";
+  sort_order: number;
+  counts_as_savings: boolean;
+  archived: boolean;
+  items: FinanceItem[];
+};
+
+export type FinanceTransaction = {
+  id: number;
+  item_id: number;
+  happened_on: string;
+  amount: number;
+  note: string | null;
+};
+
+export type MonthTotals = {
+  month: string;
+  income: number;
+  expenses: number;
+  balance: number;
+  savings: number;
+  savings_rate: number | null;
+};
+
+export type GroupSlice = {
+  group: string;
+  actual: number;
+  planned: number;
+  share_pct: number;
+};
+
+export type GroupTrendPoint = {
+  month: string;
+  values: Record<string, number>;
+};
+
+export type ItemStat = {
+  item_id: number;
+  name: string;
+  group: string;
+  actual: number;
+  planned: number | null;
+  difference: number | null;
+  average_3m: number | null;
+  months_with_spend: number;
+};
+
+export type FinanceAnalytics = {
+  months: MonthTotals[];
+  by_group: GroupSlice[];
+  group_trend: GroupTrendPoint[];
+  top_items: ItemStat[];
+  overspent: ItemStat[];
+  reference_month: string;
+};
+
+export type SavingsAccount = {
+  id: number;
+  name: string;
+  goal_amount: number | null;
+  goal_date: string | null;
+  sort_order: number;
+  archived: boolean;
+  balance: number;
+  contributed: number;
+  withdrawn: number;
+  interest: number;
+  goal_progress_pct: number | null;
+  monthly_needed: number | null;
+  last_operation_on: string | null;
+};
+
+export type SavingsSummary = {
+  accounts: SavingsAccount[];
+  total_balance: number;
+  total_goal: number | null;
+};
+
+export type SavingsOperation = {
+  id: number;
+  happened_on: string;
+  amount: number;
+  kind: "contribution" | "withdrawal" | "interest";
+  note: string | null;
+};

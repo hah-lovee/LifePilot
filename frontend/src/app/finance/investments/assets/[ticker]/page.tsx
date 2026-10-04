@@ -81,7 +81,7 @@ export default function AssetDetailPage() {
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
           <Link
-            href="/investments"
+            href="/finance/investments"
             className="mb-2 inline-flex items-center gap-1 text-[13px] text-[var(--color-muted)] hover:text-[var(--color-ink)] transition-colors"
           >
             ← Портфель

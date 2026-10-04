@@ -297,6 +297,34 @@ def copy_month(db: Session, user: User, source: date, target: date, include_amou
     return created
 
 
+def fill_month(db: Session, user: User, month: date) -> int:
+    """A plan row for every active item that has none in this month."""
+    present = {
+        item_id
+        for (item_id,) in db.query(FinancePlan.item_id).filter(
+            FinancePlan.user_id == user.id, FinancePlan.month == month
+        )
+    }
+    items = (
+        db.query(FinanceItem)
+        .join(FinanceGroup, FinanceGroup.id == FinanceItem.group_id)
+        .filter(
+            FinanceItem.user_id == user.id,
+            FinanceItem.archived_at.is_(None),
+            FinanceGroup.archived_at.is_(None),
+        )
+        .all()
+    )
+    created = 0
+    for item in items:
+        if item.id in present:
+            continue
+        db.add(FinancePlan(user_id=user.id, item_id=item.id, month=month))
+        created += 1
+    db.commit()
+    return created
+
+
 # --- analytics ------------------------------------------------------------
 
 

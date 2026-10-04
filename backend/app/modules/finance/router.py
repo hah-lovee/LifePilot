@@ -26,7 +26,6 @@ from app.modules.finance.schemas import (
     ItemOut,
     ItemUpdate,
     MonthView,
-    PlanDelete,
     PlanWrite,
     SavingsAccountCreate,
     SavingsAccountUpdate,
@@ -135,6 +134,16 @@ def copy_from_month(
         )
     created = service.copy_month(db, user, source, target, payload.include_amounts)
     return {"created": created}
+
+
+@router.post("/month/{month}/fill")
+def fill_month(
+    month: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+) -> dict[str, int]:
+    """Put every active item into this month, without amounts. Used right after
+    the default structure is created, and to bring back a row removed by
+    mistake. Items already in the month are untouched."""
+    return {"created": service.fill_month(db, user, _month(month, user))}
 
 
 # --- structure ------------------------------------------------------------
@@ -294,18 +303,21 @@ def write_plan(
 
 @router.delete("/plans", status_code=status.HTTP_204_NO_CONTENT)
 def drop_plan(
-    payload: PlanDelete, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+    item_id: int,
+    month: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ) -> None:
     """Takes the item out of that month. Its transactions stay, and while any
     remain the item keeps showing in the month — removing a row is not a way to
     hide money that was actually spent."""
-    month = _month(payload.month, user)
+    first = _month(month, user)
     plan = (
         db.query(FinancePlan)
         .filter(
             FinancePlan.user_id == user.id,
-            FinancePlan.item_id == payload.item_id,
-            FinancePlan.month == month,
+            FinancePlan.item_id == item_id,
+            FinancePlan.month == first,
         )
         .first()
     )

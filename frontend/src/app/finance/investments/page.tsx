@@ -279,7 +279,7 @@ export default function InvestmentsPage() {
                         key={w.currency}
                         onClick={() =>
                           router.push(
-                            `/investments/assets/crypto/${encodeURIComponent(w.currency)}?portfolio=${encodeURIComponent(
+                            `/finance/investments/assets/crypto/${encodeURIComponent(w.currency)}?portfolio=${encodeURIComponent(
                               exchange.portfolio_name || exchange.exchange
                             )}`
                           )
@@ -339,7 +339,7 @@ export default function InvestmentsPage() {
                     {broker.positions.map((p) => (
                       <tr
                         key={p.ticker}
-                        onClick={() => router.push(`/investments/assets/${encodeURIComponent(p.ticker)}`)}
+                        onClick={() => router.push(`/finance/investments/assets/${encodeURIComponent(p.ticker)}`)}
                         className="cursor-pointer border-b border-[#f5f5f1] hover:bg-[#fafaf8] transition-colors"
                       >
                         <td className="py-2.5">

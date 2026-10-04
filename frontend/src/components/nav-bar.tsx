@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 const links = [
   { href: "/diary", label: "Дневник", datePerDay: true },
   { href: "/sport", label: "Спорт", datePerDay: true },
-  { href: "/investments", label: "Инвестиции", datePerDay: false },
+  { href: "/finance", label: "Финансы", datePerDay: false },
   { href: "/settings", label: "Настройки", datePerDay: false },
 ];
 

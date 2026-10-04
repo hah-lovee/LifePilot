@@ -171,7 +171,7 @@ export default function InvestmentDiversificationPage() {
                         </td>
                         <td className="py-2 pl-2">
                           <button
-                            onClick={() => router.push(`/investments/assets/${encodeURIComponent(p.ticker)}`)}
+                            onClick={() => router.push(`/finance/investments/assets/${encodeURIComponent(p.ticker)}`)}
                             className="text-[12px] text-[var(--color-accent)] hover:underline"
                           >
                             →

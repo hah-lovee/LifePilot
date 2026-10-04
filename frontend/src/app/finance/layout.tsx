@@ -6,13 +6,13 @@ import type { ReactNode } from "react";
 import { RequireAuth } from "@/components/require-auth";
 
 const subLinks = [
-  { href: "/investments", label: "Портфель" },
-  { href: "/investments/dividends", label: "Дивиденды" },
-  { href: "/investments/diversification", label: "Диверсификация" },
-  { href: "/investments/connections", label: "Подключения" },
+  { href: "/finance", label: "Месяц" },
+  { href: "/finance/analytics", label: "Аналитика" },
+  { href: "/finance/savings", label: "Накопления" },
+  { href: "/finance/investments", label: "Инвестиции" },
 ];
 
-export default function InvestmentsLayout({ children }: { children: ReactNode }) {
+export default function FinanceLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   return (
@@ -20,7 +20,10 @@ export default function InvestmentsLayout({ children }: { children: ReactNode })
       <div className="-m-3 flex flex-col sm:-m-6">
         <nav className="flex gap-4 overflow-x-auto border-b border-[var(--color-border-soft)] bg-white px-4 text-sm sm:gap-6 sm:px-7">
           {subLinks.map((link) => {
-            const isActive = pathname === link.href;
+            // Инвестиции has pages of its own below it, so it stays highlighted
+            // while you are inside them; the others are single pages.
+            const isActive =
+              link.href === "/finance" ? pathname === link.href : pathname.startsWith(link.href);
             return (
               <Link
                 key={link.href}
@@ -36,7 +39,7 @@ export default function InvestmentsLayout({ children }: { children: ReactNode })
             );
           })}
         </nav>
-        <div className="bg-[var(--color-page)] p-4 sm:p-7">{children}</div>
+        {children}
       </div>
     </RequireAuth>
   );

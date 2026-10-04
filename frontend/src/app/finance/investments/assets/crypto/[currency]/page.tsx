@@ -109,7 +109,7 @@ function CryptoAssetContent() {
   return (
     <div className="mx-auto max-w-3xl">
       <Link
-        href="/investments"
+        href="/finance/investments"
         className="mb-4 inline-flex items-center gap-1 text-[13px] text-[var(--color-muted)] hover:text-[var(--color-ink)] transition-colors"
       >
         ← Портфель
