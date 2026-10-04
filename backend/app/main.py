@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.modules.admin.router import router as admin_router
 from app.modules.auth.router import router as auth_router
 from app.modules.diary.router import router as diary_router
+from app.modules.finance.router import router as finance_router
 from app.modules.habits.router import router as habits_router
 from app.modules.investments.router import router as investments_router
 from app.modules.investments.scheduler import start_scheduler as start_investments_scheduler
@@ -45,6 +46,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(habits_router)
 app.include_router(diary_router)
+app.include_router(finance_router)
 app.include_router(reports_router)
 app.include_router(sport_router)
 app.include_router(admin_router)
