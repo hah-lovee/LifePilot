@@ -498,7 +498,16 @@ function Transactions({
                 {money(row.amount)}
               </span>
               <span className="min-w-0 flex-1 truncate text-[var(--color-muted)]">
-                {row.note ?? ""}
+                {row.source === "xlsx" ? (
+                  <span
+                    className="text-[var(--color-faint)]"
+                    title="Из импортированного файла. В листах не было дат, поэтому стоит первое число."
+                  >
+                    {row.note ?? "из файла"}
+                  </span>
+                ) : (
+                  row.note ?? ""
+                )}
               </span>
               <button
                 onClick={() => remove(row.id)}
@@ -657,28 +666,50 @@ function CopyMonth({
   );
 }
 
+type ImportLine = { file: string; ok: boolean; text: string };
+
 function ImportXlsx({ onDone }: { onDone: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [status, setStatus] = useState<string | null>(null);
+  const [lines, setLines] = useState<ImportLine[]>([]);
+  const [running, setRunning] = useState(false);
 
-  async function upload(file: File) {
-    setStatus("Загружаю…");
-    const form = new FormData();
-    form.append("file", file);
-    try {
-      const result = await api.upload<{
-        month_label: string;
-        groups_created: number;
-        items_created: number;
-        transactions: number;
-      }>("/api/finance/import-xlsx", form);
-      setStatus(
-        `${result.month_label}: статей ${result.items_created}, трат ${result.transactions}`
-      );
-      onDone();
-    } catch (err) {
-      setStatus(err instanceof ApiError ? err.message : "Не удалось импортировать");
+  /** Files are sent one at a time, oldest month first, so a later month's plan
+   *  overwrites an earlier one rather than the other way round — and so one bad
+   *  file reports itself instead of failing the whole batch. */
+  async function upload(files: File[]) {
+    setRunning(true);
+    setLines([]);
+    const ordered = [...files].sort((a, b) => a.name.localeCompare(b.name));
+    for (const file of ordered) {
+      const form = new FormData();
+      form.append("file", file);
+      try {
+        const result = await api.upload<{
+          month_label: string;
+          items_created: number;
+          transactions: number;
+        }>("/api/finance/import-xlsx", form);
+        setLines((prev) => [
+          ...prev,
+          {
+            file: file.name,
+            ok: true,
+            text: `${result.month_label} — трат ${result.transactions}, новых статей ${result.items_created}`,
+          },
+        ]);
+      } catch (err) {
+        setLines((prev) => [
+          ...prev,
+          {
+            file: file.name,
+            ok: false,
+            text: err instanceof ApiError ? err.message : "не удалось импортировать",
+          },
+        ]);
+      }
     }
+    setRunning(false);
+    onDone();
   }
 
   return (
@@ -687,21 +718,31 @@ function ImportXlsx({ onDone }: { onDone: () => void }) {
         ref={inputRef}
         type="file"
         accept=".xlsx"
+        multiple
         hidden
         onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) upload(file);
+          const files = Array.from(e.target.files ?? []);
+          if (files.length) upload(files);
           e.target.value = "";
         }}
       />
       <button
         onClick={() => inputRef.current?.click()}
+        disabled={running}
         className="btn-secondary py-1.5 text-[13px]"
-        title="Файл «Личный бюджет на месяц». Месяц берётся из названия: 09_2026.xlsx"
+        title="Файлы «Личный бюджет на месяц», можно выбрать сразу несколько. Месяц берётся из названия: 09.2026.xlsx, 09.26.xlsx"
       >
-        Импорт из Excel
+        {running ? "Импортирую…" : "Импорт из Excel"}
       </button>
-      {status && <span className="text-[12px] text-[var(--color-faint)]">{status}</span>}
+      {lines.length > 0 && (
+        <ul className="w-full flex-col gap-0.5 text-[12px]">
+          {lines.map((line) => (
+            <li key={line.file} style={{ color: line.ok ? "#3f6b54" : "#b5503e" }}>
+              {line.file} — {line.text}
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   );
 }

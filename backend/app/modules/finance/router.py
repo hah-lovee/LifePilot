@@ -425,15 +425,18 @@ async def import_xlsx(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Файл больше 10 МБ")
 
     filename = file.filename or "budget.xlsx"
-    target = (
-        service.parse_month(month)
-        if month
-        else xlsx_import.month_from_filename(filename)
-    )
+    target = service.parse_month(month) if month else xlsx_import.month_from_filename(filename)
     if target is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Не понял, за какой месяц файл — назовите его как 09_2026.xlsx или укажите месяц",
+            detail="Не понял, за какой месяц файл — назовите его как 09.2026.xlsx или укажите месяц",
+        )
+    if not month and xlsx_import.looks_like_template(filename):
+        # A blank template carries a month in its name too, and importing it
+        # would overwrite that month's real plan with zeroes.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Похоже на шаблон, а не на заполненный месяц — импорт пропущен",
         )
 
     try:
@@ -455,7 +458,14 @@ def analytics(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> FinanceAnalytics:
-    return service.build_analytics(db, user, _month(month, user), months)
+    # Without an explicit month, report on the newest month that has anything
+    # in it rather than on a current month that may not have started.
+    reference = (
+        service.parse_month(month)
+        if month
+        else (service.latest_month_with_data(db, user) or _month(None, user))
+    )
+    return service.build_analytics(db, user, reference, months)
 
 
 # --- savings --------------------------------------------------------------

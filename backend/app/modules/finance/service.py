@@ -264,6 +264,18 @@ def months_with_data(db: Session, user: User) -> list[str]:
     return [format_month(m) for m in sorted(found, reverse=True)]
 
 
+def latest_month_with_data(db: Session, user: User) -> date | None:
+    """The newest month holding a transaction. The analytics default: the
+    current month is usually barely started, and opening on it shows an empty
+    report over a full archive."""
+    latest = (
+        db.query(func.max(FinanceTransaction.happened_on))
+        .filter(FinanceTransaction.user_id == user.id)
+        .scalar()
+    )
+    return date(latest.year, latest.month, 1) if latest is not None else None
+
+
 def copy_month(db: Session, user: User, source: date, target: date, include_amounts: bool) -> int:
     """Carry the source month's structure into the target: a plan row per item,
     which is what makes the item appear there. Items the target already has are

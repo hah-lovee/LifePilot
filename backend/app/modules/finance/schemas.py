@@ -108,6 +108,7 @@ class TransactionOut(BaseModel):
     happened_on: date
     amount: float
     note: str | None
+    source: str | None  # "xlsx" when it came from an imported spreadsheet
 
     model_config = {"from_attributes": True}
 

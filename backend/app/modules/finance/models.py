@@ -134,6 +134,11 @@ class FinanceTransaction(Base):
     happened_on: Mapped[date] = mapped_column(Date, nullable=False)
     amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # "xlsx" for a row the spreadsheet importer created, NULL for one entered by
+    # hand. Re-importing a month replaces its own rows and leaves the hand-typed
+    # ones alone; keying that on the filename was wrong, because the same month
+    # under a different name doubled instead of replacing.
+    source: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     item: Mapped["FinanceItem"] = relationship()

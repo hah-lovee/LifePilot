@@ -421,6 +421,8 @@ export type FinanceTransaction = {
   happened_on: string;
   amount: number;
   note: string | null;
+  /** "xlsx" — строка пришла из импортированного файла, null — внесена руками. */
+  source: string | null;
 };
 
 export type MonthTotals = {

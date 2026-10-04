@@ -47,7 +47,7 @@ INCOME_GROUP_NAME = "Доходы"
 # against it is a percentage rule rather than a sum.
 _PERCENT_FORMULA = re.compile(r"^=\s*\$?C\$?7\s*((?:\*\s*[0-9]*[.,]?[0-9]+\s*)+)$", re.IGNORECASE)
 _SUM_OF_TERMS = re.compile(r"^=\s*[0-9]+(?:[.,][0-9]+)?(?:\s*\+\s*[0-9]+(?:[.,][0-9]+)?)*$")
-_MONTH_IN_NAME = re.compile(r"(?P<a>\d{2,4})[-_. ](?P<b>\d{1,4})")
+_MONTH_IN_NAME = re.compile(r"(?P<a>\d{1,4})[-_. ](?P<b>\d{2,4})(?!\d)")
 
 
 @dataclass
@@ -88,16 +88,31 @@ class XlsxImportError(ValueError):
 
 
 def month_from_filename(filename: str) -> date | None:
-    """Accepts 09_2026, 2026-09, 09.2026 — the forms these files are named in."""
+    """The month these files are named by: 09.24, 01.25, 06.2026, 09_2026, 2026-09.
+
+    The month comes first unless the first number cannot be one, which is the
+    convention every file in the archive follows. A two-digit year is read as
+    2000-something — these are personal budgets, not records from 1924."""
     stem = filename.rsplit("/", 1)[-1].rsplit(".", 1)[0]
     match = _MONTH_IN_NAME.search(stem)
     if match is None:
         return None
     a, b = int(match.group("a")), int(match.group("b"))
     year, month = (a, b) if a > 12 else (b, a)
+    if year < 100:
+        year += 2000
     if not (1 <= month <= 12 and 1900 < year < 2200):
         return None
     return date(year, month, 1)
+
+
+def looks_like_template(filename: str) -> bool:
+    """A blank template carries a month in its name too — "шаблон бюджета(от
+    05.25)" — and importing it would overwrite that month's real plan with
+    zeroes. Only consulted when the month was guessed from the name: if the
+    caller says which month it is, they are trusted."""
+    stem = filename.rsplit("/", 1)[-1].lower()
+    return "шаблон" in stem or "template" in stem
 
 
 def _number(value: object) -> float | None:
@@ -257,9 +272,13 @@ def _parse_table(ws, wsv, table) -> ParsedGroup | None:
 # --- writing --------------------------------------------------------------
 
 
+SOURCE = "xlsx"
+
+
 def note_for(filename: str) -> str:
-    """Marks imported transactions so re-importing the same file replaces its
-    own rows instead of doubling them, and leaves hand-entered ones alone."""
+    """Shown next to the purchase, so it is obvious where a row dated the first
+    of the month came from. Identifying imported rows is `source`, not this —
+    see FinanceTransaction.source."""
     return f"импорт из {filename.rsplit('/', 1)[-1]}"
 
 
@@ -337,12 +356,16 @@ def apply_month(db: Session, user: User, parsed: ParsedMonth, filename: str) -> 
         plan.amount = None if percent is not None else amount
         plan.percent_of_income = percent
 
+    # Everything a previous import left in this month, whatever file it came
+    # from. Hand-entered rows have no source and survive.
+    next_month = date(month.year + (month.month == 12), month.month % 12 + 1, 1)
     removed = (
         db.query(FinanceTransaction)
         .filter(
             FinanceTransaction.user_id == user.id,
-            FinanceTransaction.happened_on == month,
-            FinanceTransaction.note == marker,
+            FinanceTransaction.happened_on >= month,
+            FinanceTransaction.happened_on < next_month,
+            FinanceTransaction.source == SOURCE,
         )
         .delete(synchronize_session=False)
     )
@@ -354,6 +377,7 @@ def apply_month(db: Session, user: User, parsed: ParsedMonth, filename: str) -> 
                 happened_on=month,
                 amount=amount,
                 note=marker,
+                source=SOURCE,
             )
         )
 
