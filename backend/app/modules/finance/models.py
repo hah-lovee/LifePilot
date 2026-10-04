@@ -139,6 +139,9 @@ class FinanceTransaction(Base):
     # ones alone; keying that on the filename was wrong, because the same month
     # under a different name doubled instead of replacing.
     source: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # Fingerprint of the statement row this came from, so re-importing an
+    # overlapping period adds nothing twice. NULL for everything else.
+    external_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     item: Mapped["FinanceItem"] = relationship()
@@ -194,6 +197,43 @@ class SavingsOperation(Base):
     amount: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
     kind: Mapped[str] = mapped_column(String(16), nullable=False, default=CONTRIBUTION)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Same fingerprint as on a transaction: interest credited to an account
+    # arrives in the statement too, and must not be counted twice.
+    external_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     account: Mapped["SavingsAccount"] = relationship(back_populates="operations")
+
+
+class FinanceImportRule(Base):
+    """Where a bank's own category belongs in this budget.
+
+    Keyed on direction as well as category, because one category means two
+    different things depending on the sign: "Переводы" covers both money sent
+    to a person — an expense — and money moved in from another of your own
+    accounts, which is not income at all.
+
+    Exactly one of `item_id`, `savings_account_id` or `ignored` is set."""
+
+    __tablename__ = "finance_import_rules"
+
+    OUT = "out"
+    IN = "in"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    bank: Mapped[str] = mapped_column(String(16), nullable=False)
+    category: Mapped[str] = mapped_column(String(120), nullable=False)
+    direction: Mapped[str] = mapped_column(String(8), nullable=False)
+    item_id: Mapped[int | None] = mapped_column(
+        ForeignKey("finance_items.id", ondelete="CASCADE"), nullable=True
+    )
+    savings_account_id: Mapped[int | None] = mapped_column(
+        ForeignKey("savings_accounts.id", ondelete="CASCADE"), nullable=True
+    )
+    ignored: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "bank", "category", "direction", name="uq_finance_import_rules_key"),
+    )

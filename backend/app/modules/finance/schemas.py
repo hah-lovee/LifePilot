@@ -1,6 +1,6 @@
 from datetime import date
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.modules.finance.models import EXPENSE, INCOME
 
@@ -269,3 +269,58 @@ class SavingsSummary(BaseModel):
     accounts: list[SavingsAccountOut]
     total_balance: float
     total_goal: float | None
+
+
+# --- Bank statement import ------------------------------------------------
+
+
+class UnmappedCategory(BaseModel):
+    category: str
+    direction: str  # "out" — деньги ушли, "in" — пришли
+    count: int
+    total: float
+    examples: list[str]
+
+
+class StatementResult(BaseModel):
+    rows: int
+    imported: int
+    duplicates: int
+    ignored: int
+    period_from: date | None
+    period_to: date | None
+    unmapped: list[UnmappedCategory]
+
+
+class ImportRuleWrite(BaseModel):
+    category: str = Field(min_length=1, max_length=120)
+    direction: str
+    item_id: int | None = None
+    savings_account_id: int | None = None
+    ignored: bool = False
+
+    @field_validator("direction")
+    @classmethod
+    def known_direction(cls, value: str) -> str:
+        if value not in ("in", "out"):
+            raise ValueError("direction must be 'in' or 'out'")
+        return value
+
+    @model_validator(mode="after")
+    def exactly_one_target(self) -> "ImportRuleWrite":
+        targets = [self.item_id is not None, self.savings_account_id is not None, self.ignored]
+        if sum(targets) != 1:
+            raise ValueError("укажите ровно одно: статью, накопительный счёт или «не учитывать»")
+        return self
+
+
+class ImportRuleOut(BaseModel):
+    id: int
+    bank: str
+    category: str
+    direction: str
+    item_id: int | None
+    savings_account_id: int | None
+    ignored: bool
+
+    model_config = {"from_attributes": True}

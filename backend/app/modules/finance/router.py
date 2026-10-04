@@ -7,9 +7,10 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.deps import get_current_user
 from app.models.user import User
-from app.modules.finance import service, xlsx_import
+from app.modules.finance import csv_import, service, xlsx_import
 from app.modules.finance.models import (
     FinanceGroup,
+    FinanceImportRule,
     FinanceItem,
     FinancePlan,
     FinanceTransaction,
@@ -18,6 +19,8 @@ from app.modules.finance.models import (
 )
 from app.modules.finance.schemas import (
     CopyMonthRequest,
+    ImportRuleOut,
+    ImportRuleWrite,
     FinanceAnalytics,
     GroupCreate,
     GroupOut,
@@ -32,6 +35,7 @@ from app.modules.finance.schemas import (
     SavingsOperationCreate,
     SavingsOperationOut,
     SavingsSummary,
+    StatementResult,
     TransactionCreate,
     TransactionOut,
     TransactionUpdate,
@@ -446,6 +450,96 @@ async def import_xlsx(
 
     result = xlsx_import.apply_month(db, user, parsed, filename)
     return {**result, "month_label": service.format_month(target)}
+
+
+# --- import from a bank statement ----------------------------------------
+
+_MAX_CSV_BYTES = 20 * 1024 * 1024
+
+
+@router.post("/import-statement", response_model=StatementResult)
+async def import_statement(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> StatementResult:
+    """Load a Т-Банк CSV export.
+
+    Writes every row it has a mapping rule for and reports the categories it
+    has none for. Set those rules and upload the same file again: each row
+    carries a fingerprint, so nothing is counted twice."""
+    content = await file.read()
+    if len(content) > _MAX_CSV_BYTES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Файл больше 20 МБ")
+    try:
+        rows = csv_import.parse_statement(content)
+    except csv_import.StatementError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return StatementResult(**csv_import.apply_statement(db, user, rows))
+
+
+@router.get("/import-rules", response_model=list[ImportRuleOut])
+def list_import_rules(
+    db: Session = Depends(get_db), user: User = Depends(get_current_user)
+) -> list[FinanceImportRule]:
+    return (
+        db.query(FinanceImportRule)
+        .filter(FinanceImportRule.user_id == user.id)
+        .order_by(FinanceImportRule.category, FinanceImportRule.direction)
+        .all()
+    )
+
+
+@router.put("/import-rules", response_model=ImportRuleOut)
+def write_import_rule(
+    payload: ImportRuleWrite,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> FinanceImportRule:
+    if payload.item_id is not None:
+        _owned_item(db, user, payload.item_id)
+    if payload.savings_account_id is not None:
+        _owned_account(db, user, payload.savings_account_id)
+
+    rule = (
+        db.query(FinanceImportRule)
+        .filter(
+            FinanceImportRule.user_id == user.id,
+            FinanceImportRule.bank == csv_import.BANK_TBANK,
+            FinanceImportRule.category == payload.category,
+            FinanceImportRule.direction == payload.direction,
+        )
+        .first()
+    )
+    if rule is None:
+        rule = FinanceImportRule(
+            user_id=user.id,
+            bank=csv_import.BANK_TBANK,
+            category=payload.category,
+            direction=payload.direction,
+        )
+        db.add(rule)
+    rule.item_id = payload.item_id
+    rule.savings_account_id = payload.savings_account_id
+    rule.ignored = payload.ignored
+    db.commit()
+    db.refresh(rule)
+    return rule
+
+
+@router.delete("/import-rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_import_rule(
+    rule_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+) -> None:
+    rule = (
+        db.query(FinanceImportRule)
+        .filter(FinanceImportRule.id == rule_id, FinanceImportRule.user_id == user.id)
+        .first()
+    )
+    if rule is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Правило не найдено")
+    db.delete(rule)
+    db.commit()
 
 
 # --- analytics ------------------------------------------------------------

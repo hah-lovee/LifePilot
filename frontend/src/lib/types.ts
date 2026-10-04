@@ -495,3 +495,34 @@ export type SavingsOperation = {
   kind: "contribution" | "withdrawal" | "interest";
   note: string | null;
 };
+
+// --- Финансы: импорт банковской выписки -------------------------------------
+
+export type UnmappedCategory = {
+  category: string;
+  /** "out" — деньги ушли, "in" — пришли. Категория значит разное по сторонам. */
+  direction: "out" | "in";
+  count: number;
+  total: number;
+  examples: string[];
+};
+
+export type StatementResult = {
+  rows: number;
+  imported: number;
+  duplicates: number;
+  ignored: number;
+  period_from: string | null;
+  period_to: string | null;
+  unmapped: UnmappedCategory[];
+};
+
+export type ImportRule = {
+  id: number;
+  bank: string;
+  category: string;
+  direction: "out" | "in";
+  item_id: number | null;
+  savings_account_id: number | null;
+  ignored: boolean;
+};

@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
+import { StatementImport } from "@/components/statement-import";
 import { currentMonth, money, monthLabel, shiftMonth, signedMoney, todayIso } from "@/lib/money";
 import type { FinanceTransaction, MonthGroup, MonthItem, MonthView } from "@/lib/types";
 
@@ -103,6 +104,11 @@ function FinanceMonth() {
 
         {view && !view.is_empty && (
           <>
+            <p className="mb-3.5 text-[12.5px] text-[var(--color-muted)]">
+              План правится прямо в строке. Факт — нажмите на статью или на её сумму: откроется
+              список трат с формой добавления.
+            </p>
+
             <div className="mb-3.5 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
               <Summary label="Доходы" planned={view.planned_income} actual={view.actual_income} />
               <Summary
@@ -167,6 +173,7 @@ function FinanceMonth() {
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <CopyMonth month={month} source={view.previous_month} onDone={() => load(month)} />
               <ImportXlsx onDone={() => load(month)} />
+              <StatementImport onDone={() => load(month)} />
             </div>
           </>
         )}
@@ -354,13 +361,20 @@ function ItemRow({
         <td className="py-1.5 pr-2">
           <button
             onClick={onToggle}
-            className="text-left text-[13px] text-[var(--color-ink)] hover:text-[var(--color-accent)]"
+            className="flex items-center gap-1 text-left text-[13px] text-[var(--color-ink)] hover:text-[var(--color-accent)]"
+            title="Открыть траты по статье"
           >
-            {item.name}
+            <span
+              className="w-2.5 flex-shrink-0 text-[9px] text-[var(--color-faint)]"
+              aria-hidden
+            >
+              {isOpen ? "▼" : "▶"}
+            </span>
+            <span className="underline decoration-[#e0e0da] decoration-1 underline-offset-[3px]">
+              {item.name}
+            </span>
             {item.transactions > 0 && (
-              <span className="ml-1.5 text-[11px] text-[var(--color-faint)]">
-                {item.transactions}
-              </span>
+              <span className="text-[11px] text-[var(--color-faint)]">{item.transactions}</span>
             )}
           </button>
         </td>
@@ -391,14 +405,24 @@ function ItemRow({
             />
           )}
         </td>
-        <td className="py-1.5 text-right font-mono text-[13px] font-semibold text-[var(--color-ink)]">
-          {item.actual === 0 ? (
-            <span className="font-normal text-[var(--color-faint)]">—</span>
-          ) : (
-            money(item.actual)
-          )}
+        <td className="py-1.5 text-right">
+          <button
+            onClick={onToggle}
+            className="font-mono text-[13px] font-semibold text-[var(--color-ink)] hover:text-[var(--color-accent)]"
+            title={item.actual === 0 ? "Внести трату" : "Показать траты"}
+          >
+            {item.actual === 0 ? (
+              <span className="font-sans text-[12px] font-medium text-[var(--color-accent)]">
+                + внести
+              </span>
+            ) : (
+              money(item.actual)
+            )}
+          </button>
           {item.difference !== null && item.difference < 0 && (
-            <span className="ml-1 text-[10.5px] text-[#b5503e]">{signedMoney(item.difference)}</span>
+            <span className="ml-1 font-mono text-[10.5px] text-[#b5503e]">
+              {signedMoney(item.difference)}
+            </span>
           )}
         </td>
         <td className="py-1.5 text-right">
@@ -614,6 +638,7 @@ function EmptyMonth({
           </button>
         )}
         <ImportXlsx onDone={onDone} />
+        <StatementImport onDone={onDone} />
         <button
           disabled={busy}
           onClick={() =>
