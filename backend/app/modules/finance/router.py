@@ -33,6 +33,7 @@ from app.modules.finance.schemas import (
     SavingsAccountCreate,
     SavingsAccountUpdate,
     SavingsOperationCreate,
+    SavingsOperationUpdate,
     SavingsOperationOut,
     SavingsSummary,
     StatementResult,
@@ -83,7 +84,12 @@ def _owned_item(db: Session, user: User, item_id: int) -> FinanceItem:
     return item
 
 
-def _group_out(group: FinanceGroup, items: list[FinanceItem]) -> GroupOut:
+def _group_out(
+    group: FinanceGroup,
+    items: list[FinanceItem],
+    counts: dict[int, tuple[int, int]] | None = None,
+) -> GroupOut:
+    counts = counts or {}
     return GroupOut(
         id=group.id,
         name=group.name,
@@ -98,6 +104,8 @@ def _group_out(group: FinanceGroup, items: list[FinanceItem]) -> GroupOut:
                 name=item.name,
                 sort_order=item.sort_order,
                 archived=item.archived_at is not None,
+                transactions=counts.get(item.id, (0, 0))[0],
+                months=counts.get(item.id, (0, 0))[1],
             )
             for item in sorted(items, key=lambda i: (i.sort_order, i.name.lower()))
         ],
@@ -162,7 +170,8 @@ def structure(
     by_group: dict[int, list[FinanceItem]] = {}
     for item in items:
         by_group.setdefault(item.group_id, []).append(item)
-    return [_group_out(group, by_group.get(group.id, [])) for group in groups]
+    counts = service.item_history_counts(db, user)
+    return [_group_out(group, by_group.get(group.id, []), counts) for group in groups]
 
 
 @router.post("/bootstrap")
@@ -253,8 +262,13 @@ def update_item(
     data = payload.model_dump(exclude_unset=True)
     if "archived" in data:
         item.archived_at = datetime.now(timezone.utc) if data.pop("archived") else None
-    if "group_id" in data and data["group_id"] is not None:
+    if data.get("group_id") is not None and data["group_id"] != item.group_id:
         _owned_group(db, user, data["group_id"])
+        # The item takes its plans and transactions with it, so every past
+        # month is reclassified too. Its old position means nothing in the new
+        # group, so it lands at the end.
+        if "sort_order" not in data:
+            data["sort_order"] = service.next_item_order(db, user, data["group_id"])
     for field, value in data.items():
         setattr(item, field, value)
     db.commit()
@@ -659,6 +673,43 @@ def create_operation(
         note=payload.note,
     )
     db.add(operation)
+    db.commit()
+    db.refresh(operation)
+    return operation
+
+
+@router.patch(
+    "/savings/{account_id}/operations/{operation_id}", response_model=SavingsOperationOut
+)
+def update_operation(
+    account_id: int,
+    operation_id: int,
+    payload: SavingsOperationUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> SavingsOperation:
+    _owned_account(db, user, account_id)
+    operation = (
+        db.query(SavingsOperation)
+        .filter(
+            SavingsOperation.id == operation_id,
+            SavingsOperation.account_id == account_id,
+            SavingsOperation.user_id == user.id,
+        )
+        .first()
+    )
+    if operation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Операция не найдена")
+
+    data = payload.model_dump(exclude_unset=True)
+    for field, value in data.items():
+        setattr(operation, field, value)
+    # The sign is derived, never taken on trust: turning a deposit into a
+    # withdrawal has to flip it, and an amount retyped as positive must not
+    # quietly undo that.
+    kind = data.get("kind", operation.kind)
+    amount = abs(float(data.get("amount", operation.amount)))
+    operation.amount = -amount if kind == SavingsOperation.WITHDRAWAL else amount
     db.commit()
     db.refresh(operation)
     return operation

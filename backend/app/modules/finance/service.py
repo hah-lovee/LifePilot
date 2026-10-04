@@ -671,6 +671,33 @@ def active_structure(db: Session, user: User) -> list[FinanceGroup]:
     )
 
 
+def item_history_counts(db: Session, user: User) -> dict[int, tuple[int, int]]:
+    """Per item: how many transactions, and how many distinct months they span.
+
+    Shown beside the delete button — removing a статья takes its history with
+    it, and that should be visible before the click rather than after."""
+    rows = (
+        db.query(FinanceTransaction.item_id, FinanceTransaction.happened_on)
+        .filter(FinanceTransaction.user_id == user.id)
+        .all()
+    )
+    totals: dict[int, int] = defaultdict(int)
+    months: dict[int, set[tuple[int, int]]] = defaultdict(set)
+    for item_id, happened_on in rows:
+        totals[item_id] += 1
+        months[item_id].add((happened_on.year, happened_on.month))
+    return {item_id: (count, len(months[item_id])) for item_id, count in totals.items()}
+
+
+def next_item_order(db: Session, user: User, group_id: int) -> int:
+    highest = (
+        db.query(func.max(FinanceItem.sort_order))
+        .filter(FinanceItem.user_id == user.id, FinanceItem.group_id == group_id)
+        .scalar()
+    )
+    return (highest or 0) + 1
+
+
 def owned_item(db: Session, user: User, item_id: int) -> FinanceItem | None:
     return (
         db.query(FinanceItem)

@@ -241,29 +241,16 @@ function Operations({
       {rows && rows.length > 0 && (
         <ul className="mb-2.5 flex flex-col gap-1">
           {rows.map((row) => (
-            <li key={row.id} className="flex items-center gap-2 text-[12.5px]">
-              <span className="w-[76px] flex-shrink-0 font-mono text-[var(--color-faint)]">
-                {row.happened_on}
-              </span>
-              <span
-                className="w-[96px] flex-shrink-0 text-right font-mono font-semibold"
-                style={{ color: row.amount >= 0 ? "#3f6b54" : "#b5503e" }}
-              >
-                {signedMoney(row.amount)}
-              </span>
-              <span className="w-[66px] flex-shrink-0 text-[var(--color-faint)]">
-                {KIND_LABEL[row.kind]}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-[var(--color-muted)]">
-                {row.note ?? ""}
-              </span>
-              <button
-                onClick={() => remove(row.id)}
-                className="flex-shrink-0 text-[#a2a29b] hover:text-[#b5503e]"
-              >
-                ×
-              </button>
-            </li>
+            <OperationRow
+              key={row.id}
+              accountId={account.id}
+              row={row}
+              onSaved={async () => {
+                await load();
+                onChanged();
+              }}
+              onRemove={() => remove(row.id)}
+            />
           ))}
         </ul>
       )}
@@ -311,6 +298,133 @@ function Operations({
       </p>
       {error && <p className="mt-1.5 text-[12px] text-[#b5503e]">{error}</p>}
     </div>
+  );
+}
+
+/** One movement on a savings account, edited in place.
+ *
+ *  The amount is always typed positive — the kind decides the sign, both here
+ *  and on the server — so switching "взнос" to "снятие" is enough to correct a
+ *  mistake, with nothing to re-type. */
+function OperationRow({
+  accountId,
+  row,
+  onSaved,
+  onRemove,
+}: {
+  accountId: number;
+  row: SavingsOperation;
+  onSaved: () => Promise<void>;
+  onRemove: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [when, setWhen] = useState(row.happened_on);
+  const [kind, setKind] = useState<SavingsOperation["kind"]>(row.kind);
+  const [amount, setAmount] = useState(String(Math.abs(row.amount)));
+  const [note, setNote] = useState(row.note ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  function start() {
+    setWhen(row.happened_on);
+    setKind(row.kind);
+    setAmount(String(Math.abs(row.amount)));
+    setNote(row.note ?? "");
+    setError(null);
+    setEditing(true);
+  }
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    const value = parseAmount(amount);
+    if (value === null || value === 0) {
+      setError("Сумма не похожа на число");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.patch(`/api/finance/savings/${accountId}/operations/${row.id}`, {
+        happened_on: when,
+        kind,
+        amount: Math.abs(value),
+        note: note.trim() || null,
+      });
+      setEditing(false);
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Не удалось сохранить");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <li>
+        <form onSubmit={save} className="flex flex-wrap items-center gap-1.5">
+          <input
+            type="date"
+            value={when}
+            onChange={(e) => setWhen(e.target.value)}
+            className="input-field w-[132px] py-1 text-[12.5px]"
+          />
+          <select
+            value={kind}
+            onChange={(e) => setKind(e.target.value as SavingsOperation["kind"])}
+            className="input-field w-auto py-1 text-[12.5px]"
+          >
+            <option value="contribution">взнос</option>
+            <option value="withdrawal">снятие</option>
+            <option value="interest">проценты</option>
+          </select>
+          <input
+            autoFocus
+            type="text"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="input-field w-[92px] py-1 text-[12.5px]"
+          />
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Заметка"
+            className="input-field min-w-[100px] flex-1 py-1 text-[12.5px]"
+          />
+          <button type="submit" disabled={busy} className="btn-secondary py-1 text-[12.5px]">
+            Сохранить
+          </button>
+          <button type="button" onClick={() => setEditing(false)} className="btn-text text-[12.5px]">
+            Отмена
+          </button>
+          {error && <span className="w-full text-[12px] text-[#b5503e]">{error}</span>}
+        </form>
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex items-center gap-2 text-[12.5px]">
+      <span className="w-[76px] flex-shrink-0 font-mono text-[var(--color-faint)]">
+        {row.happened_on}
+      </span>
+      <span
+        className="w-[96px] flex-shrink-0 text-right font-mono font-semibold"
+        style={{ color: row.amount >= 0 ? "#3f6b54" : "#b5503e" }}
+      >
+        {signedMoney(row.amount)}
+      </span>
+      <span className="w-[66px] flex-shrink-0 text-[var(--color-faint)]">
+        {KIND_LABEL[row.kind]}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[var(--color-muted)]">{row.note ?? ""}</span>
+      <button onClick={start} className="btn-text flex-shrink-0 text-[12px]">
+        Изменить
+      </button>
+      <button onClick={onRemove} className="flex-shrink-0 text-[#a2a29b] hover:text-[#b5503e]">
+        ×
+      </button>
+    </li>
   );
 }
 

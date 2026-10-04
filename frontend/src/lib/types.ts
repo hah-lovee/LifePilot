@@ -403,6 +403,9 @@ export type FinanceItem = {
   name: string;
   sort_order: number;
   archived: boolean;
+  /** Сколько трат на статье и за сколько месяцев — цена её удаления. */
+  transactions: number;
+  months: number;
 };
 
 export type FinanceGroup = {

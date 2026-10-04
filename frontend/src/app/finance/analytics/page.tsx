@@ -17,7 +17,7 @@ import {
   YAxis,
 } from "recharts";
 import { api, ApiError } from "@/lib/api";
-import { money, monthLabel, signedMoney } from "@/lib/money";
+import { money, monthLabel, shiftMonth, signedMoney } from "@/lib/money";
 import type { FinanceAnalytics } from "@/lib/types";
 
 // Enough hues to tell a dozen groups apart, in the muted range the rest of the
@@ -46,15 +46,35 @@ const WINDOWS = [
 
 export default function FinanceAnalyticsPage() {
   const [months, setMonths] = useState(12);
+  // Null until the first answer arrives: the server picks the newest month
+  // that has anything in it, which is a better opening view than today's
+  // barely-started month and is not knowable here.
+  const [month, setMonth] = useState<string | null>(null);
+  const [known, setKnown] = useState<string[]>([]);
   const [data, setData] = useState<FinanceAnalytics | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api
-      .get<FinanceAnalytics>(`/api/finance/analytics?months=${months}`)
-      .then(setData)
+      .get<string[]>("/api/finance/months")
+      .then(setKnown)
+      .catch(() => setKnown([]));
+  }, []);
+
+  useEffect(() => {
+    const query = month ? `?months=${months}&month=${month}` : `?months=${months}`;
+    api
+      .get<FinanceAnalytics>(`/api/finance/analytics${query}`)
+      .then((loaded) => {
+        setData(loaded);
+        if (month === null) setMonth(loaded.reference_month);
+      })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Ошибка загрузки"));
-  }, [months]);
+  }, [months, month]);
+
+  const current = month ?? data?.reference_month ?? null;
+  const hasEarlier = current !== null && known.some((m) => m < current);
+  const hasLater = current !== null && known.some((m) => m > current);
 
   const colorOf = useMemo(() => {
     const names = data?.by_group.map((g) => g.group) ?? [];
@@ -80,7 +100,7 @@ export default function FinanceAnalyticsPage() {
   return (
     <div className="bg-[var(--color-page)] p-4 sm:p-7">
       <div className="mx-auto max-w-4xl">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">
             Аналитика
           </h1>
@@ -99,6 +119,38 @@ export default function FinanceAnalyticsPage() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="mb-5 flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => current && setMonth(shiftMonth(current, -1))}
+              disabled={!hasEarlier}
+              className="btn-secondary px-2.5 py-1 text-[12.5px] disabled:opacity-40"
+              aria-label="Предыдущий месяц"
+            >
+              ←
+            </button>
+            <input
+              type="month"
+              value={current ?? ""}
+              onChange={(e) => e.target.value && setMonth(e.target.value)}
+              className="input-field w-auto py-1 text-[12.5px]"
+            />
+            <button
+              onClick={() => current && setMonth(shiftMonth(current, 1))}
+              disabled={!hasLater}
+              className="btn-secondary px-2.5 py-1 text-[12.5px] disabled:opacity-40"
+              aria-label="Следующий месяц"
+            >
+              →
+            </button>
+          </div>
+          <span className="text-[12px] text-[var(--color-muted)]">
+            Месяц задаёт разрезы и топы. Графики по месяцам показывают{" "}
+            {months === 6 ? "шесть" : months === 12 ? "двенадцать" : "двадцать четыре"} месяцев до
+            него включительно.
+          </span>
         </div>
 
         {error && <p className="mb-4 text-sm text-[#b5503e]">{error}</p>}

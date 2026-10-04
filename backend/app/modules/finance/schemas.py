@@ -53,6 +53,10 @@ class ItemOut(BaseModel):
     name: str
     sort_order: int
     archived: bool
+    # How much history hangs on the item, so deleting it is an informed choice
+    # rather than a surprise.
+    transactions: int = 0
+    months: int = 0
 
 
 class GroupOut(BaseModel):
@@ -234,6 +238,28 @@ class SavingsOperationCreate(BaseModel):
     @classmethod
     def nonzero(cls, value: float) -> float:
         if value == 0:
+            raise ValueError("amount must not be zero")
+        return value
+
+
+class SavingsOperationUpdate(BaseModel):
+    happened_on: date | None = None
+    amount: float | None = None
+    kind: str | None = None
+    note: str | None = None
+
+    @field_validator("kind")
+    @classmethod
+    def known_kind(cls, value: str | None) -> str | None:
+        allowed = ("contribution", "withdrawal", "interest")
+        if value is not None and value not in allowed:
+            raise ValueError(f"kind must be one of {allowed}")
+        return value
+
+    @field_validator("amount")
+    @classmethod
+    def nonzero(cls, value: float | None) -> float | None:
+        if value is not None and value == 0:
             raise ValueError("amount must not be zero")
         return value
 

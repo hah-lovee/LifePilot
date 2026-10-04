@@ -9,6 +9,7 @@ const subLinks = [
   { href: "/finance", label: "Месяц" },
   { href: "/finance/analytics", label: "Аналитика" },
   { href: "/finance/savings", label: "Накопления" },
+  { href: "/finance/items", label: "Статьи" },
   { href: "/finance/investments", label: "Инвестиции" },
 ];
 

@@ -25,6 +25,52 @@ const WEEKDAYS = [
   { value: 6, label: "Вс" },
 ];
 
+/** The habit's name, editable on click.
+ *
+ *  Renaming keeps the habit's id, so every past score and the streak stay
+ *  attached to it — which is the reason to rename rather than create a new one
+ *  and lose the history. */
+function HabitName({ name, onSave }: { name: string; onSave: (next: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(name);
+
+  useEffect(() => setDraft(name), [name]);
+
+  if (!editing) {
+    return (
+      <button
+        onClick={() => setEditing(true)}
+        title="Переименовать"
+        className="text-left text-2xl font-semibold tracking-tight text-[var(--color-ink)] underline decoration-[#e0e0da] decoration-1 underline-offset-4 hover:decoration-[var(--color-accent)]"
+      >
+        {name}
+      </button>
+    );
+  }
+
+  function commit() {
+    setEditing(false);
+    onSave(draft);
+  }
+
+  return (
+    <input
+      autoFocus
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") commit();
+        if (e.key === "Escape") {
+          setDraft(name);
+          setEditing(false);
+        }
+      }}
+      className="input-field w-full max-w-[320px] py-1 text-xl font-semibold"
+    />
+  );
+}
+
 export default function HabitDetailPage() {
   return (
     <Suspense>
@@ -143,6 +189,17 @@ function HabitDetailContent() {
     setReminderWeekdays((prev) => (prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value].sort()));
   }
 
+  async function saveName(next: string) {
+    const trimmed = next.trim();
+    if (!trimmed || trimmed === habit?.name) return;
+    setError(null);
+    try {
+      setHabit(await api.patch<Habit>(`/api/habits/${habitId}`, { name: trimmed }));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Не удалось переименовать привычку");
+    }
+  }
+
   async function saveReminder() {
     setReminderSaveStatus("saving");
     setError(null);
@@ -180,7 +237,7 @@ function HabitDetailContent() {
             ← Привычки
           </Link>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">{habit.name}</h1>
+            <HabitName name={habit.name} onSave={saveName} />
             <span className="rounded-md bg-[#f2f2ee] px-2 py-0.5 text-[11.5px] text-[var(--color-muted)]">
               {frequencyLabel[habit.frequency]}
             </span>

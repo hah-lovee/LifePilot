@@ -529,32 +529,15 @@ function Transactions({
       {rows && rows.length > 0 && (
         <ul className="mb-2 flex flex-col gap-1">
           {rows.map((row) => (
-            <li key={row.id} className="flex items-center gap-2 text-[12.5px]">
-              <span className="w-[42px] flex-shrink-0 font-mono text-[var(--color-faint)]">
-                {row.happened_on.slice(8)}.{row.happened_on.slice(5, 7)}
-              </span>
-              <span className="w-[86px] flex-shrink-0 text-right font-mono font-semibold text-[var(--color-ink)]">
-                {money(row.amount)}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-[var(--color-muted)]">
-                {row.source === "xlsx" ? (
-                  <span
-                    className="text-[var(--color-faint)]"
-                    title="Из импортированного файла. В листах не было дат, поэтому стоит первое число."
-                  >
-                    {row.note ?? "из файла"}
-                  </span>
-                ) : (
-                  row.note ?? ""
-                )}
-              </span>
-              <button
-                onClick={() => remove(row.id)}
-                className="flex-shrink-0 text-[#a2a29b] hover:text-[#b5503e]"
-              >
-                ×
-              </button>
-            </li>
+            <TransactionRow
+              key={row.id}
+              row={row}
+              onSaved={async () => {
+                await load();
+                onChanged();
+              }}
+              onRemove={() => remove(row.id)}
+            />
           ))}
         </ul>
       )}
@@ -590,6 +573,129 @@ function Transactions({
       </form>
       {error && <p className="mt-1.5 text-[12px] text-[#b5503e]">{error}</p>}
     </div>
+  );
+}
+
+/** One logged purchase: shown as a line, edited in place.
+ *
+ *  Imported rows are editable too — the whole point of a date on an imported
+ *  purchase is that you can correct it, since the spreadsheet had none. Editing
+ *  one keeps its source mark, so a later re-import of that month still replaces
+ *  it rather than leaving a duplicate behind. */
+function TransactionRow({
+  row,
+  onSaved,
+  onRemove,
+}: {
+  row: FinanceTransaction;
+  onSaved: () => Promise<void>;
+  onRemove: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [when, setWhen] = useState(row.happened_on);
+  const [amount, setAmount] = useState(String(row.amount));
+  const [note, setNote] = useState(row.note ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  function start() {
+    setWhen(row.happened_on);
+    setAmount(String(row.amount));
+    setNote(row.note ?? "");
+    setError(null);
+    setEditing(true);
+  }
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    const value = parseAmount(amount);
+    if (value === null || value <= 0) {
+      setError("Сумма не похожа на число");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.patch(`/api/finance/transactions/${row.id}`, {
+        happened_on: when,
+        amount: value,
+        note: note.trim() || null,
+      });
+      setEditing(false);
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Не удалось сохранить");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <li>
+        <form onSubmit={save} className="flex flex-wrap items-center gap-1.5">
+          <input
+            type="date"
+            value={when}
+            onChange={(e) => setWhen(e.target.value)}
+            className="input-field w-[130px] py-1 text-[12.5px]"
+          />
+          <input
+            autoFocus
+            type="text"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="input-field w-[88px] py-1 text-[12.5px]"
+          />
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Заметка"
+            className="input-field min-w-[100px] flex-1 py-1 text-[12.5px]"
+          />
+          <button type="submit" disabled={busy} className="btn-secondary py-1 text-[12.5px]">
+            Сохранить
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            className="btn-text text-[12.5px]"
+          >
+            Отмена
+          </button>
+          {error && <span className="w-full text-[12px] text-[#b5503e]">{error}</span>}
+        </form>
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex items-center gap-2 text-[12.5px]">
+      <span className="w-[42px] flex-shrink-0 font-mono text-[var(--color-faint)]">
+        {row.happened_on.slice(8)}.{row.happened_on.slice(5, 7)}
+      </span>
+      <span className="w-[86px] flex-shrink-0 text-right font-mono font-semibold text-[var(--color-ink)]">
+        {money(row.amount)}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[var(--color-muted)]">
+        {row.source === "xlsx" ? (
+          <span
+            className="text-[var(--color-faint)]"
+            title="Из импортированного файла. В листах не было дат, поэтому стоит первое число — его можно поправить."
+          >
+            {row.note ?? "из файла"}
+          </span>
+        ) : (
+          row.note ?? ""
+        )}
+      </span>
+      <button onClick={start} className="btn-text flex-shrink-0 text-[12px]">
+        Изменить
+      </button>
+      <button onClick={onRemove} className="flex-shrink-0 text-[#a2a29b] hover:text-[#b5503e]">
+        ×
+      </button>
+    </li>
   );
 }
 
