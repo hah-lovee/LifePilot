@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "@/lib/api";
-import { money, signedMoney, todayIso } from "@/lib/money";
+import { money, parseAmount, signedMoney, todayIso } from "@/lib/money";
 import type { SavingsAccount, SavingsOperation, SavingsSummary } from "@/lib/types";
 
 const KIND_LABEL: Record<SavingsOperation["kind"], string> = {
@@ -203,8 +203,11 @@ function Operations({
 
   async function add(e: FormEvent) {
     e.preventDefault();
-    const value = Number(amount);
-    if (!value) return;
+    const value = parseAmount(amount);
+    if (value === null || value === 0) {
+      setError("Сумма не похожа на число");
+      return;
+    }
     setError(null);
     try {
       await api.post(`/api/finance/savings/${account.id}/operations`, {
@@ -285,9 +288,8 @@ function Operations({
           <option value="interest">проценты</option>
         </select>
         <input
-          type="number"
-          min="0"
-          step="1"
+          type="text"
+          inputMode="decimal"
           placeholder="Сумма"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
@@ -304,7 +306,8 @@ function Operations({
         </button>
       </form>
       <p className="mt-1.5 text-[11px] text-[var(--color-faint)]">
-        Сумму вводите положительной — знак ставится по виду операции.
+        Сумму вводите положительной — знак ставится по виду операции. Копейки можно через запятую
+        или точку: 12345,67
       </p>
       {error && <p className="mt-1.5 text-[12px] text-[#b5503e]">{error}</p>}
     </div>
@@ -322,9 +325,14 @@ function NewAccount({ onDone, onCancel }: { onDone: () => void; onCancel: () => 
     if (!name.trim()) return;
     setError(null);
     try {
+      const parsedGoal = goal.trim() ? parseAmount(goal) : null;
+      if (goal.trim() && parsedGoal === null) {
+        setError("Цель не похожа на число");
+        return;
+      }
       await api.post("/api/finance/savings", {
         name: name.trim(),
-        goal_amount: goal ? Number(goal) : null,
+        goal_amount: parsedGoal,
         goal_date: goalDate || null,
       });
       onDone();
@@ -352,9 +360,9 @@ function NewAccount({ onDone, onCancel }: { onDone: () => void; onCancel: () => 
           Цель, ₽
         </span>
         <input
-          type="number"
-          min="0"
-          step="1000"
+          type="text"
+          inputMode="decimal"
+          placeholder="300000"
           value={goal}
           onChange={(e) => setGoal(e.target.value)}
           className="input-field w-[120px] py-1.5 text-[13px]"

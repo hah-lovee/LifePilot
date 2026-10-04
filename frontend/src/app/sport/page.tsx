@@ -362,12 +362,14 @@ function SetRow({
     <div className="flex flex-wrap items-center gap-2 rounded-md bg-[#fbfbfa] px-2.5 py-1.5">
       {isEditing ? (
         <form onSubmit={save} className="flex flex-1 flex-wrap items-center gap-1.5">
+          {/* step="any", not "0.5": a step makes the browser reject anything off
+              the grid, so a 72.3 kg machine could not be saved at all. */}
           <input
             type="number"
             value={weight}
             onChange={(e) => setWeight(e.target.value)}
             className="input-field w-[88px] min-w-[72px] flex-1"
-            step="0.5"
+            step="any"
             min="0"
             placeholder="Вес, кг"
             autoFocus

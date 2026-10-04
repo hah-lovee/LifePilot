@@ -49,3 +49,17 @@ export function todayIso(): string {
     now.getDate()
   ).padStart(2, "0")}`;
 }
+
+/** Reads a typed amount, accepting both separators.
+ *
+ *  `<input type="number">` refuses a comma outright — the value comes back
+ *  empty — and the Russian numeric keypad puts a comma on the decimal key, so
+ *  money fields are plain text inputs parsed here instead. Returns null for
+ *  anything that is not a number, so a typo cannot be saved as 0. */
+export function parseAmount(raw: string): number | null {
+  const cleaned = raw.trim().replace(/\s| /g, "").replace(",", ".");
+  if (!cleaned) return null;
+  if (!/^-?\d*\.?\d*$/.test(cleaned)) return null;
+  const value = Number(cleaned);
+  return Number.isFinite(value) ? value : null;
+}

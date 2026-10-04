@@ -255,7 +255,7 @@ export default function AdminCatalogPage() {
                 type="number"
                 min={8}
                 max={336}
-                step={12}
+                step={1}
                 defaultValue={g.recovery_hours}
                 onBlur={(e) => {
                   const hours = Number(e.target.value);

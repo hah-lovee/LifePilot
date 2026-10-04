@@ -4,7 +4,15 @@ import { Suspense, useCallback, useEffect, useRef, useState, type FormEvent } fr
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { StatementImport } from "@/components/statement-import";
-import { currentMonth, money, monthLabel, shiftMonth, signedMoney, todayIso } from "@/lib/money";
+import {
+  currentMonth,
+  money,
+  monthLabel,
+  parseAmount,
+  shiftMonth,
+  signedMoney,
+  todayIso,
+} from "@/lib/money";
 import type { FinanceTransaction, MonthGroup, MonthItem, MonthView } from "@/lib/types";
 
 export default function FinancePage() {
@@ -391,14 +399,18 @@ function ItemRow({
             </span>
           ) : (
             <input
-              type="number"
-              min="0"
-              step="100"
+              type="text"
+              inputMode="decimal"
               value={plan}
               disabled={busy}
               onChange={(e) => setPlan(e.target.value)}
               onBlur={() => {
-                const next = plan === "" ? null : Number(plan);
+                const next = plan.trim() === "" ? null : parseAmount(plan);
+                // An unparseable entry is put back rather than saved as nothing.
+                if (next === null && plan.trim() !== "") {
+                  setPlan(item.planned === null ? "" : String(item.planned));
+                  return;
+                }
                 if (next !== item.planned) onSavePlan(item.item_id, next);
               }}
               className="input-field w-[86px] py-0.5 text-right font-mono text-[12.5px]"
@@ -478,8 +490,11 @@ function Transactions({
 
   async function add(e: FormEvent) {
     e.preventDefault();
-    const value = Number(amount);
-    if (!value || value <= 0) return;
+    const value = parseAmount(amount);
+    if (value === null || value <= 0) {
+      setError("Сумма не похожа на число");
+      return;
+    }
     setError(null);
     try {
       await api.post("/api/finance/transactions", {
@@ -556,9 +571,8 @@ function Transactions({
         />
         <input
           ref={amountRef}
-          type="number"
-          min="0"
-          step="1"
+          type="text"
+          inputMode="decimal"
           placeholder="Сумма"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
